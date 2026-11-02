@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>clip overlay with reaction panel</title>
+<link rel="stylesheet" href="{{base}}short.css"></head>
+<body>
+  <!-- y ranges: top block 0..380, game frame 380..988 (video), reaction panel 988..1588 (video),
+       bottom block 1588..1920. 380 + 608 + 600 + 332 = 1920 -->
+  <div class="panel" style="top:0; height:380px"></div>
+  <div class="panel" style="top:1588px; height:332px"></div>
+  <!-- top block: tag 44..92, title from 108 (size <= 120), rule and subtitle below it, ends by about 335 -->
+  <div class="tag" style="top:44px; font-size:26px; padding:10px 20px">{{channel}}</div>
+  <div class="abs heading white" style="top:108px; font-size:{{title_size}}px">{{title}}</div>
+  <div class="rule" style="top:{{rule_y}}px"></div>
+  <div class="abs mono blue" style="top:{{sub_y}}px; font-size:{{subtitle_size}}px">{{subtitle}}</div>
+  <!-- reaction panel frame (988..1588) with the label chip and the rank progress inside its top edge -->
+  <div class="cam-frame"></div>
+  <div class="chip">{{channel}} REACTS</div>
+  {{raw:bottom}}
+  <!-- handle strip 1848..1920 -->
+  <div class="strip" style="top:1848px; height:72px; font-size:32px">{{handle}}</div>
+</body></html>

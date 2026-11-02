@@ -1,0 +1,14 @@
+{
+  "title": "TOP 3 GOALS",
+  "subtitle": "YOUR EVENT 26 | MATCHDAY 1",
+  "source": "/path/to/stream-full.mp4",
+  "output": "/path/to/shorts/top3-goals.mp4",
+  "clips": [
+    {"rank": 3, "start": "00:35:08", "end": "00:35:22", "player": "PLAYER ONE", "team": "BLUE TEAM",
+     "caption": "AIR DRIBBLE FINISH", "detail": "vs ORANGE TEAM | GAME 3"},
+    {"rank": 2, "start": "00:21:09", "end": "00:21:23", "player": "PLAYER TWO", "team": "BLUE TEAM",
+     "caption": "FLIP RESET", "detail": "vs ORANGE TEAM | GAME 2"},
+    {"rank": 1, "start": "01:26:41", "end": "01:26:55", "player": "PLAYER ONE", "team": "BLUE TEAM",
+     "caption": "DOUBLE TAP", "detail": "vs ORANGE TEAM | GAME 5"}
+  ]
+}

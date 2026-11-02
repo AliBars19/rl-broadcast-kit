@@ -1,0 +1,60 @@
+/* Shared styles for the Short graphics. Hard rules: letter-spacing 0, no glow/shadow/spotlight. */
+@font-face { font-family: "Chakra Petch"; font-weight: 700; src: url(../../../fonts/ChakraPetch-700.woff2) format("woff2"); }
+@font-face { font-family: "Chakra Petch"; font-weight: 600; src: url(../../../fonts/ChakraPetch-600.woff2) format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 400; src: url(../../../fonts/IBMPlexMono-400.woff2) format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 600; src: url(../../../fonts/IBMPlexMono-600.woff2) format("woff2"); }
+
+:root {
+  --navy: #07090d;
+  --panel: #121722;
+  --amber: #f5b83d;
+  --blue: #4da3ff;
+  --orange: #ff7a45;
+  --text: #f1f4fa;
+  --dim: #98a3b8;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; letter-spacing: 0; }
+html, body { width: 1080px; height: 1920px; background: transparent; overflow: hidden; }
+body { position: relative; font-family: "Chakra Petch", sans-serif; font-weight: 700; color: var(--text); }
+.abs { position: absolute; left: 60px; width: 960px; white-space: nowrap; overflow: hidden; }
+.center { text-align: center; }
+.mono { font-family: "IBM Plex Mono", monospace; font-weight: 600; }
+.heading { font-family: "Chakra Petch", sans-serif; font-weight: 700; line-height: 1.05; }
+
+.tag { position: absolute; left: 60px; background: var(--amber); color: var(--navy);
+  font-family: "IBM Plex Mono", monospace; font-weight: 600; font-size: 30px;
+  line-height: 1; padding: 11px 22px; }
+.tag.centered { left: 50%; transform: translateX(-50%); }
+.rule { position: absolute; left: 60px; width: 140px; height: 8px; background: var(--amber); }
+.rule.centered { left: 50%; margin-left: -70px; }
+.amber { color: var(--amber); }
+.blue { color: var(--blue); }
+.orange { color: var(--orange); }
+.dim { color: var(--dim); }
+.white { color: var(--text); }
+
+/* progress indicator: one box per rank */
+.progress { position: absolute; left: 60px; display: flex; gap: 14px; }
+.progress.centered { left: 0; width: 1080px; justify-content: center; }
+.progress .step { width: 84px; height: 60px; display: flex; align-items: center; justify-content: center;
+  font-family: "Chakra Petch", sans-serif; font-weight: 700; font-size: 38px; line-height: 1; border: 4px solid var(--amber); }
+.progress .done { color: var(--amber); background: transparent; }
+.progress .current { color: var(--navy); background: var(--amber); }
+.progress .todo { color: var(--dim); border-color: #3a4357; background: transparent; }
+
+.strip { position: absolute; left: 0; width: 1080px; height: 84px; background: var(--panel);
+  border-top: 4px solid var(--amber); display: flex; align-items: center; justify-content: center;
+  font-family: "IBM Plex Mono", monospace; font-weight: 600; font-size: 34px; color: var(--amber); }
+.panel { position: absolute; left: 0; width: 1080px; background: rgba(7, 9, 13, 0.72); }
+.caption-bar { position: absolute; left: 60px; width: 960px; height: 96px; background: var(--amber);
+  color: var(--navy); display: flex; align-items: center; padding: 0 28px; white-space: nowrap; overflow: hidden;
+  font-family: "Chakra Petch", sans-serif; font-weight: 700; line-height: 1; }
+
+/* reaction layout: facecam panel 988..1588 (see render_short.py for the arithmetic) */
+.cam-frame { position: absolute; left: 0; top: 988px; width: 1080px; height: 600px; border: 4px solid var(--amber); }
+.chip { position: absolute; left: 24px; top: 1004px; background: var(--amber); color: var(--navy);
+  font-family: "Chakra Petch", sans-serif; font-weight: 700; font-size: 28px; line-height: 1; padding: 10px 18px; }
+.progress.compact { left: auto; right: 24px; top: 1004px; gap: 8px; }
+.progress.compact .step { width: 54px; height: 46px; font-size: 28px; border-width: 3px; background: rgba(7, 9, 13, 0.78); }
+.progress.compact .current { background: var(--amber); }
