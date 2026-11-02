@@ -1,0 +1,24 @@
+# runtime state and local backups
+scoreboard-state.json
+*.bak
+*.bak-*
+__pycache__/
+*.pyc
+
+# secrets must never be committed
+.obs-password
+.env
+*.key
+service.json
+**/obs-websocket/config.json
+
+# rendered output (carries your own branding)
+program/stinger/stinger.webm
+program/stinger/stinger-preview.mp4
+
+# your own assets and footage
+program/assets/*
+!program/assets/.gitkeep
+*.replay
+*.mp4
+*.mkv
