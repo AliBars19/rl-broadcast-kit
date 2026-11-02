@@ -1,0 +1,310 @@
+/* ==========================================================================
+   Stream overlays: shared styles
+   Navy and amber palette, Chakra Petch / IBM Plex type. All fonts are free (SIL Open Font License)
+   and load from ./fonts, so nothing depends on the internet. If a font file
+   is missing, every stack falls back to fonts already on Windows.
+   ========================================================================== */
+
+@font-face { font-family: "Chakra Petch"; src: url("fonts/ChakraPetch-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Chakra Petch"; src: url("fonts/ChakraPetch-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Chakra Petch"; src: url("fonts/ChakraPetch-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "IBM Plex Sans"; src: url("fonts/IBMPlexSans-var.woff2") format("woff2"); font-weight: 100 700; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("fonts/IBMPlexMono-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("fonts/IBMPlexMono-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("fonts/IBMPlexMono-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+
+:root {
+  /* surfaces */
+  --bg-page: #07090d;
+  --bg-app: #0b0e14;
+  --bg-header: #080a0f;
+  --panel: #121722;
+  --panel-raised: #161c28;
+  --inset: #0d1118;
+  --panel-glass: rgba(18, 23, 34, 0.92);
+  /* lines */
+  --divider: #1a202b;
+  --border: #1f2633;
+  --border-strong: #2a3342;
+  --border-raised: #3a4556;
+  /* text */
+  --text: #e8ecf2;
+  --text-2: #c4ccd8;
+  --text-3: #a7b0bf;
+  --muted: #8b95a7;
+  --disabled: #5a6475;
+  /* accents */
+  --accent: #f5b83d;
+  --accent-hover: #ffd27a;
+  --on-accent: #0b0e14;
+  --win: #4da3ff;
+  --loss: #ff7a45;
+  --highlight-bg: #1a1f12;
+  --highlight-border: #5c4a1c;
+
+  /* type: each stack ends in fonts every Windows PC already has */
+  --font-display: "Chakra Petch", "Noto Sans", "DejaVu Sans", "Bahnschrift", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", "Noto Sans", "DejaVu Sans", "Segoe UI", system-ui, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", "DejaVu Sans Mono", "Noto Sans Mono", Consolas, "Cascadia Mono", "Courier New", monospace;
+
+  --radius: 6px;
+  --ease: cubic-bezier(.4, 0, .2, 1);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Transparent pages (HUD layers): OBS composites them over the game */
+body.transparent { background: transparent; }
+
+/* --- reusable bits ------------------------------------------------------ */
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 22px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.live-dot {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border-radius: 2px;
+  background: var(--loss);
+  box-shadow: 0 0 0 0 rgba(255, 122, 69, .6);
+  animation: pulse 2s var(--ease) infinite;
+}
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(255, 122, 69, .55); }
+  70%  { box-shadow: 0 0 0 10px rgba(255, 122, 69, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 122, 69, 0); }
+}
+
+/* platform tags, same shape as win/loss chips */
+.chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 14px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 4px;
+  border: 1px solid var(--border-strong); color: var(--text-2);
+  background: var(--inset);
+}
+.chip.accent { color: var(--on-accent); background: var(--accent); border-color: var(--accent); }
+
+/* ======================================================================
+   FULL-SCREEN SCENES (starting / brb / ending)
+   ====================================================================== */
+
+body.scene {
+  background:
+    radial-gradient(1200px 700px at 78% 18%, rgba(245, 184, 61, .07), transparent 60%),
+    radial-gradient(900px 600px at 10% 100%, rgba(77, 163, 255, .05), transparent 60%),
+    var(--bg-page);
+}
+
+/* faint pitch grid */
+.grid-bg {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(var(--divider) 1px, transparent 1px),
+    linear-gradient(90deg, var(--divider) 1px, transparent 1px);
+  background-size: 64px 64px;
+  background-position: -1px -1px;
+  opacity: .55;
+  -webkit-mask-image: radial-gradient(ellipse at 60% 45%, #000 20%, transparent 75%);
+          mask-image: radial-gradient(ellipse at 60% 45%, #000 20%, transparent 75%);
+}
+
+.topbar {
+  position: absolute; left: 0; right: 0; top: 0; height: 88px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 72px;
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 18px; }
+.brand-mark {
+  width: 40px; height: 40px; border-radius: 6px;
+  display: grid; place-items: center;
+  background: var(--accent); color: var(--on-accent);
+  font-family: var(--font-display); font-weight: 700; font-size: 22px;
+}
+.brand-name { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter-spacing: .04em; text-transform: uppercase; }
+.topbar .meta { display: flex; align-items: center; gap: 28px; font-family: var(--font-mono); font-size: 18px; color: var(--text-3); letter-spacing: .08em; }
+.topbar .meta .sep { width: 1px; height: 22px; background: var(--border-strong); }
+
+.hero {
+  position: absolute; left: 160px; right: 160px; top: 290px;
+}
+.hero .eyebrow { display: flex; align-items: center; gap: 16px; }
+.hero .eyebrow::before { content: ""; width: 56px; height: 3px; background: var(--accent); }
+.hero h1 {
+  margin: 26px 0 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 168px;
+  line-height: .92;
+  letter-spacing: -.01em;
+  text-transform: uppercase;
+}
+.hero h1 .hl { color: var(--accent); }
+.hero p.sub {
+  margin: 30px 0 0;
+  max-width: 980px;
+  font-size: 30px; line-height: 1.45; color: var(--text-2);
+}
+
+/* stat tiles row (countdown, socials) */
+.tiles { position: absolute; left: 160px; right: 160px; bottom: 120px; display: flex; gap: 20px; }
+.tile {
+  flex: 1; min-width: 0;
+  padding: 22px 26px 24px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+  position: relative; overflow: hidden;
+}
+.tile .label { margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+.tile .value {
+  font-family: var(--font-display); font-weight: 600; font-size: 38px; line-height: 1.1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tile.feature { flex: 1.25; background: var(--highlight-bg); border-color: var(--highlight-border); }
+.tile.feature .value { color: var(--accent); font-family: var(--font-mono); font-weight: 600; font-size: 56px; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+.tile .bar { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--accent); width: 0; transition: width 1s linear; }
+
+.platform-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.p-twitch  { background: #a970ff; }
+.p-youtube { background: #ff4e45; }
+.p-tiktok  { background: #25f4ee; }
+
+/* bottom ticker */
+.ticker {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 64px;
+  background: var(--bg-header); border-top: 1px solid var(--border);
+  display: flex; align-items: center; overflow: hidden;
+}
+.ticker .tag {
+  flex: none; height: 100%; display: flex; align-items: center; padding: 0 28px;
+  background: var(--accent); color: var(--on-accent);
+  font-family: var(--font-mono); font-weight: 600; font-size: 18px; letter-spacing: .14em; text-transform: uppercase;
+}
+.ticker .track { flex: 1; overflow: hidden; white-space: nowrap; }
+.ticker .run {
+  display: inline-block; padding-left: 100%;
+  font-family: var(--font-mono); font-size: 20px; color: var(--text-3); letter-spacing: .06em;
+  animation: tick 40s linear infinite;
+}
+.ticker .run span { margin-right: 64px; }
+.ticker .run span::before { content: "//"; color: var(--accent); margin-right: 14px; }
+@keyframes tick { to { transform: translateX(-100%); } }
+
+/* indeterminate loading bar for BRB */
+.loader { position: relative; height: 4px; width: 520px; margin-top: 44px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.loader::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 35%;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: sweep 1.8s var(--ease) infinite;
+}
+@keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+
+/* entrance */
+.rise { opacity: 0; transform: translateY(18px); animation: rise .9s var(--ease-out) forwards; }
+.d1 { animation-delay: .1s; } .d2 { animation-delay: .25s; } .d3 { animation-delay: .4s; } .d4 { animation-delay: .55s; }
+@keyframes rise { to { opacity: 1; transform: none; } }
+
+/* ======================================================================
+   HUD LAYERS (transparent, sit over gameplay)
+   ====================================================================== */
+
+/* stream-info panel: top-left. RL's top-left corner is empty in matches. */
+.info {
+  position: absolute; left: 32px; top: 32px;
+  display: flex; align-items: stretch; height: 52px;
+  background: var(--panel-glass);
+  border: 1px solid var(--border-strong); border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+}
+.info > div { display: flex; align-items: center; gap: 12px; padding: 0 18px; border-right: 1px solid var(--border); }
+.info > div:last-child { border-right: 0; }
+.info .who { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: .05em; text-transform: uppercase; }
+.info .game { font-family: var(--font-mono); font-size: 16px; color: var(--text-3); letter-spacing: .08em; text-transform: uppercase; }
+.info .rot { position: relative; width: 250px; overflow: hidden; }
+.info .rot .item {
+  position: absolute; left: 18px; right: 18px; top: 0; bottom: 0;
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-mono); font-size: 16px; color: var(--text-2);
+  opacity: 0; transform: translateY(100%);
+  transition: opacity .5s var(--ease), transform .5s var(--ease);
+}
+.info .rot .item.on { opacity: 1; transform: none; }
+.info .rot .item.off { opacity: 0; transform: translateY(-100%); }
+
+/* lower third: bottom-left, next to the webcam frame */
+.l3 {
+  position: absolute; left: 512px; bottom: 45px;
+  display: flex; align-items: stretch;
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, .45));
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path .8s var(--ease-out);
+}
+.l3.show { clip-path: inset(0 0 0 0); }
+.l3 .slab { width: 10px; background: var(--accent); border-radius: var(--radius) 0 0 var(--radius); }
+.l3 .body {
+  background: var(--panel-glass); border: 1px solid var(--border-strong); border-left: 0;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 14px 28px 16px 22px;
+}
+.l3 .name { font-family: var(--font-display); font-weight: 700; font-size: 44px; line-height: 1; text-transform: uppercase; letter-spacing: .03em; }
+.l3 .tag { margin-top: 8px; font-family: var(--font-mono); font-size: 18px; color: var(--text-3); letter-spacing: .06em; }
+.l3 .tag b { color: var(--accent); font-weight: 600; }
+
+/* webcam frame: 448x252 (16:9) slot, bottom-left */
+.cam {
+  position: absolute; left: 32px; top: 783px; width: 448px; height: 252px;
+  border: 2px solid var(--border-raised); border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+}
+.cam .corner { position: absolute; width: 26px; height: 26px; border: 3px solid var(--accent); }
+.cam .tl { left: -6px; top: -6px; border-right: 0; border-bottom: 0; border-radius: 4px 0 0 0; }
+.cam .tr { right: -6px; top: -6px; border-left: 0; border-bottom: 0; border-radius: 0 4px 0 0; }
+.cam .bl { left: -6px; bottom: -6px; border-right: 0; border-top: 0; border-radius: 0 0 0 4px; }
+.cam .br { right: -6px; bottom: -6px; border-left: 0; border-top: 0; border-radius: 0 0 4px 0; }
+.cam .tabbar {
+  position: absolute; left: -2px; top: -40px; height: 32px;
+  display: flex; align-items: center; gap: 10px; padding: 0 12px;
+  background: var(--panel-glass); border: 1px solid var(--border-strong); border-radius: 4px;
+  font-family: var(--font-mono); font-size: 14px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--text-2);
+}
+
+/* top-left event label (slanted marker) */
+.event { display: flex; align-items: center; gap: 16px; }
+.event-slash { width: 34px; height: 30px; background: var(--accent); transform: skewX(-20deg); border-radius: 2px; }
+.event-name { font-family: var(--font-display); font-weight: 700; font-size: 26px; letter-spacing: .08em; text-transform: uppercase; color: var(--text); }

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Boost Panels</title>
+<link rel="stylesheet" href="overlay.css">
+<script src="config.js"></script>
+<script src="common.js"></script>
+<style>
+  /* Broadcast-style player panels down the sides. The local player's team (blue when the player is not
+     in the match data) sits on the left, as in Rocket League's own HUD. Card colour follows
+     the team, not the column.
+     Data: Rocket League's Stats API, via rl-relay.js on the gaming PC.
+     Add ?demo=1 to preview with fake data (local player on orange). Add ?me=blue or ?me=orange to pin the sides. */
+  :root { --blue: var(--win); --orange: var(--loss); }
+  .side { position: absolute; top: 150px; display: flex; flex-direction: column; gap: 10px;
+          transition: opacity .5s var(--ease), transform .5s var(--ease-out); }
+  .side.left  { left: 0; }
+  .side.right { right: 0; align-items: flex-end; }
+  body.idle .side.left  { opacity: 0; transform: translateX(-40px); }
+  body.idle .side.right { opacity: 0; transform: translateX(40px); }
+
+  .card { position: relative; width: 300px; height: 62px; background: var(--panel-glass);
+          border: 1px solid var(--border-strong); overflow: hidden;
+          box-shadow: 0 8px 22px rgba(0,0,0,.35); }
+  .left .card  { border-left: 0; border-radius: 0 var(--radius) var(--radius) 0; padding: 8px 16px 0 20px; }
+  .right .card { border-right: 0; border-radius: var(--radius) 0 0 var(--radius); padding: 8px 20px 0 16px; }
+  .card::before { content: ""; position: absolute; top: 0; bottom: 0; width: 6px; background: var(--team); }
+  .left .card::before  { left: 0; }
+  .right .card::before { right: 0; }
+  .card.t0 { --team: var(--blue); }
+  .card.t1 { --team: var(--orange); }
+  .card.me { background: linear-gradient(90deg, var(--highlight-bg), var(--panel-glass) 70%); border-color: var(--highlight-border); }
+  .right .card.me { background: linear-gradient(270deg, var(--highlight-bg), var(--panel-glass) 70%); }
+
+  .row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .right .row { flex-direction: row-reverse; }
+  .pname { font-family: var(--font-display); font-weight: 700; font-size: 22px;
+           text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+  .card.me .pname { color: var(--accent); }
+  .pboost { font-family: var(--font-mono); font-weight: 600; font-size: 24px; color: var(--text);
+            font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
+  .right .pboost { text-align: left; }
+  .track { position: absolute; left: 20px; right: 16px; bottom: 9px; height: 6px; background: var(--inset);
+           border-radius: 3px; overflow: hidden; }
+  .right .track { left: 16px; right: 20px; }
+  .fill { height: 100%; width: 0; background: var(--team); border-radius: 3px; transition: width .12s linear; }
+  .right .fill { margin-left: auto; }
+  .fill.full { background: var(--accent); }
+  .card.demo-dead { opacity: .45; }
+  /* Name tag: the game hides this player's boost, so no number and no bar, just the name */
+  .card { transition: height .2s var(--ease-out); }
+  .card.tag { height: 40px; }
+  .left .card.tag  { padding: 0 16px 0 20px; }
+  .right .card.tag { padding: 0 20px 0 16px; }
+  .card.tag .row { height: 100%; align-items: center; }
+  .card.tag .track, .card.tag .pboost { display: none; }
+</style>
+</head>
+<body class="transparent idle">
+  <div class="side left"  id="left"></div>
+  <div class="side right" id="right"></div>
+<script>
+(function () {
+  var ME = ((OV.S.boost && OV.S.boost.me) || OV.S.name || "").toLowerCase();
+  var WS = OV.param("ws") || (OV.S.boost && OV.S.boost.relay) || "ws://127.0.0.1:49124";
+  var FORCE = OV.param("me");   // ?me=blue or ?me=orange pins the sides (testing)
+  var cols = { left: document.getElementById("left"), right: document.getElementById("right") };
+  var leftTeam = 0;             // TeamNum shown in the left column: 0 blue, 1 orange
+  var lastSide = null;          // team the local player was last positively found on (null = never seen)
+  var cards = {}, lastData = 0;
+
+  function isMe(p) { return !!ME && String(p.Name || "").toLowerCase() === ME; }
+
+  // The local player's team goes on the left, as in Rocket League's HUD. A side only changes when
+  // the local player is positively found on a team; a missing player keeps the last side, so the
+  // panels do not flicker. After 60 s with no data lastSide resets (see the idle timer).
+  // ?me=blue / ?me=orange always wins. Blue left is the default.
+  function leftTeamFor(players) {
+    if (FORCE === "blue") return 0;
+    if (FORCE === "orange") return 1;
+    for (var i = 0; i < players.length; i++) {
+      var p = players[i];
+      if ((p.TeamNum === 0 || p.TeamNum === 1) && isMe(p)) { lastSide = p.TeamNum; break; }
+    }
+    return lastSide == null ? 0 : lastSide;
+  }
+
+  function colFor(team) { return team === leftTeam ? cols.left : cols.right; }
+
+  function cardFor(p) {
+    var key = p.TeamNum + ":" + (p.Shortcut != null ? p.Shortcut : p.Name);
+    var c = cards[key];
+    if (!c) {
+      c = document.createElement("div");
+      c.className = "card t" + p.TeamNum;
+      c.innerHTML = '<div class="row"><span class="pname"></span><span class="pboost"></span></div>' +
+                    '<div class="track"><div class="fill"></div></div>';
+      cards[key] = c;
+    }
+    c._seen = true;
+    var col = colFor(p.TeamNum);
+    if (c.parentNode !== col) col.appendChild(c);   // re-parents when the sides flip
+    return c;
+  }
+
+  function render(players) {
+    leftTeam = leftTeamFor(players);
+    Object.keys(cards).forEach(function (k) { cards[k]._seen = false; });
+    players.forEach(function (p) {
+      if (p.TeamNum !== 0 && p.TeamNum !== 1) return;
+      var c = cardFor(p);
+      c.querySelector(".pname").textContent = p.Name || "Player";
+      c.classList.toggle("me", isMe(p));
+      c.classList.toggle("demo-dead", !!p.bDemolished);
+      var b = c.querySelector(".pboost"), f = c.querySelector(".fill");
+      // Stats API hides opponents' boost while you're playing (only shown when spectating).
+      // Without a boost number the card becomes a name tag; it returns to full when boost arrives.
+      c.classList.toggle("tag", typeof p.Boost !== "number");
+      if (typeof p.Boost === "number") {
+        var v = Math.max(0, Math.min(100, Math.round(p.Boost)));
+        b.textContent = v;
+        f.style.width = v + "%"; f.classList.toggle("full", v >= 100);
+      } else {
+        b.textContent = ""; f.style.width = "0";
+      }
+    });
+    Object.keys(cards).forEach(function (k) {
+      if (!cards[k]._seen) { cards[k].remove(); delete cards[k]; }
+    });
+    lastData = Date.now();
+    document.body.classList.remove("idle");
+  }
+
+  // hide panels when no match data for 4 s (menus, replays, between games)
+  setInterval(function () {
+    var quiet = Date.now() - lastData;
+    if (quiet > 4000) document.body.classList.add("idle");
+    if (quiet > 60000) lastSide = null;   // long gap: forget the side, next match starts blue left
+  }, 1000);
+
+  if (OV.param("demo") === "1") {
+    // The local player is on ORANGE, so the orange team shows on the left by default.
+    var t = 0;
+    setInterval(function () {
+      t += 0.05;
+      render([
+        { Name: "YOUR NAME", TeamNum: 1, Shortcut: 0, Boost: 50 + 50 * Math.sin(t) },
+        { Name: "Teammate", TeamNum: 1, Shortcut: 1, Boost: 100 * Math.abs(Math.cos(t * .7)) },
+        { Name: "Opponent1", TeamNum: 0, Shortcut: 2 },
+        { Name: "Opponent2", TeamNum: 0, Shortcut: 3 }
+      ]);
+    }, 50);
+    return;
+  }
+
+  function connect() {
+    var ws;
+    try { ws = new WebSocket(WS); } catch (e) { return setTimeout(connect, 2000); }
+    ws.onmessage = function (ev) {
+      var msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
+      if (msg.Event !== "UpdateState") return;
+      var d = msg.Data;
+      if (typeof d === "string") { try { d = JSON.parse(d); } catch (e) { return; } }
+      if (d && Array.isArray(d.Players)) render(d.Players);
+    };
+    ws.onclose = function () { setTimeout(connect, 2000); };
+  }
+  connect();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Stream Info</title>
+<link rel="stylesheet" href="overlay.css">
+<script src="config.js"></script>
+<script src="common.js"></script>
+</head>
+<body class="transparent">
+  <div class="info">
+    <div><span class="live-dot"></span><span class="who" data-bind="name">Ali</span></div>
+    <div><span class="game" data-bind="game">Rocket League</span></div>
+    <div class="rot" id="rot"></div>
+  </div>
+<script>
+  (function () {
+    var rot = document.getElementById("rot"), list = OV.platforms;
+    if (!list.length) { rot.remove(); return; }
+    rot.innerHTML = list.map(function (p) {
+      return '<div class="item"><span class="platform-dot ' + p.cls + '"></span>' + OV.esc(p.handle) + "</div>";
+    }).join("");
+    var items = rot.querySelectorAll(".item"), i = 0;
+    items[0].classList.add("on");
+    if (items.length < 2) return;
+    setInterval(function () {
+      var cur = items[i]; i = (i + 1) % items.length; var nxt = items[i];
+      cur.classList.remove("on"); cur.classList.add("off");
+      nxt.classList.remove("off"); void nxt.offsetWidth; nxt.classList.add("on");
+      setTimeout(function () { cur.classList.remove("off"); }, 600);
+    }, (OV.S.infoRotateSeconds || 8) * 1000);
+  })();
+</script>
+</body>
+</html>

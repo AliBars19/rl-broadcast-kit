@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Scoreboard</title>
+<link rel="stylesheet" href="overlay.css">
+<style>
+  /* ======================================================================
+     Rocket League's own HUD draws the score boxes and the clock. We only
+     draw what is AROUND it. Nudge these numbers if the bars drift off the
+     game's boxes (1920x1080 source).
+     ====================================================================== */
+  :root {
+    /* Measured on a 1920x1080 frame: the game's outer score box edges sit at x 781 and 1139 at the
+       top of the HUD (179 px either side of x = 960) and lean inward by 8 px at the bottom edge.
+       Everything is derived from these, so the assembly is symmetric about x = 960. */
+    --hud-half: 179px;     /* 960 to each score box OUTER edge, measured at the top of the HUD */
+    --hud-nudge-x: 0px;    /* shift the whole assembly if the game HUD ever sits differently */
+    --end-slant: 8px;      /* the score box edges lean in this far over the HUD height */
+    --cx: calc(960px + var(--hud-nudge-x));
+    --hud-in: calc(var(--hud-half) - var(--end-slant));   /* bar inner edge at the bottom of the strip */
+    --bar-h: 88px;         /* height of the game HUD strip */
+    --bar-len: 520px;      /* length of each bar, outward from the HUD */
+    --plate-w: 150px;      /* logo plate width (outer end), incl. slant */
+    --slant: 48px;         /* slant of the plate and body edges */
+    --name-size: 30px;     /* max team name size (shrinks to fit) */
+    --pip-w: 38px;
+    --pip-gap: 12px;
+
+    --blue-lit: #62cdff;   --blue-dim: #2b3b50;   --blue-edge: #7fd4ff;
+    --orange-lit: #ffb62e; --orange-dim: #4d3f26; --orange-edge: #f5b83d;
+    --glass-top: #1b222d;
+    --glass-bot: #090c11;
+    --tab-gold: #f2c83a;
+    --font-sb: "Chakra Petch", "Noto Sans", "DejaVu Sans", sans-serif;
+
+    /* shared strip finish: the bars' glass, and the rim lines that run across bar, gap and bar */
+    --sb-ext: 4px;         /* idle panel runs this far under each bar's inner slanted end */
+    --glass-fill: linear-gradient(180deg, rgba(255,255,255,.07) 0%, rgba(255,255,255,0) 45%),
+                  linear-gradient(180deg, var(--glass-top), var(--glass-bot));
+    --rim-top: linear-gradient(90deg, rgba(160,215,255,.25), rgba(210,240,255,.9) 25%,
+               rgba(255,226,150,.9) 75%, rgba(245,184,61,.3));   /* blue tint left, gold tint right */
+    --rim-bot: linear-gradient(90deg, rgba(255,255,255,.12), rgba(255,255,255,.4) 50%, rgba(255,255,255,.12));
+  }
+
+  .sb-bar {
+    position: absolute; top: 0;
+    width: var(--bar-len); height: var(--bar-h);
+    opacity: 0;
+    animation: sb-in .7s var(--ease-out) .1s forwards;
+  }
+  /* geometry follows the SIDE (l / r), colours follow the TEAM (blue / orange) */
+  .sb-bar.l { left: calc(var(--cx) - var(--hud-in) - var(--bar-len)); --from: -70px; }
+  .sb-bar.r { left: calc(var(--cx) + var(--hud-in)); transform: scaleX(-1); --from: 70px; }
+  .sb-bar.blue { --lit: var(--blue-lit); --dim: var(--blue-dim); --edge: var(--blue-edge);
+           --plate-a: #2f3b52; --plate-b: #1a2335; }
+  .sb-bar.orange { --lit: var(--orange-lit); --dim: var(--orange-dim); --edge: var(--orange-edge);
+           --plate-a: #3d372f; --plate-b: #241f1a; }
+  .sb-bar > * { position: absolute; top: 0; height: 100%; }
+
+  @keyframes sb-in {
+    from { opacity: 0; translate: var(--from) 0; }
+    to   { opacity: 1; translate: 0 0; }
+  }
+
+  /* centre bridge: rim lines only, so the strip reads as one piece while the game's own
+     score boxes and clock (drawn underneath) stay fully visible */
+  .sb-bridge {
+    position: absolute; top: 0; height: var(--bar-h);
+    left: calc(var(--cx) - var(--hud-half)); width: calc(var(--hud-half) * 2);
+    clip-path: polygon(0 0, 100% 0, calc(100% - var(--end-slant)) 100%, var(--end-slant) 100%);
+    pointer-events: none; opacity: 0;
+    animation: sb-fade .7s var(--ease-out) .1s forwards;
+  }
+  .sb-bridge::before, .sb-bridge::after { content: ""; position: absolute; left: 0; right: 0; height: 2px; }
+  .sb-bridge::before { top: 0; background: var(--rim-top); }
+  .sb-bridge::after { bottom: 0; background: var(--rim-bot); }
+  @keyframes sb-fade { from { opacity: 0; } to { opacity: 1; } }
+
+  /* idle centre panel: fills the HUD gap when no match is live (menus, lobby, game closed).
+     Sits BELOW the bars and runs --sb-ext under each bar's inner slanted end, so no edge can show.
+     Same fill as the bars (--glass-fill). No outline and no rim of its own: the bridge draws the
+     rim lines across the gap in both states. Opacity only: 0.22 s in, 0.18 s out. */
+  .sb-idle {
+    position: absolute; top: 0; height: var(--bar-h);
+    left: calc(var(--cx) - var(--hud-half) - var(--sb-ext));
+    width: calc(var(--hud-half) * 2 + var(--sb-ext) * 2);
+    /* the box is --sb-ext wider per side, so this slant sits 4 px outside each bar's inner edge */
+    clip-path: polygon(0 0, 100% 0, calc(100% - var(--end-slant)) 100%, var(--end-slant) 100%);
+    background: var(--glass-fill);
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+    padding: 0 28px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .18s ease;
+  }
+  .sb-idle.show { opacity: 1; transition: opacity .22s ease; }
+  /* the amber event mark: same size and skew as .event-slash in overlay.css */
+  .sb-idle-mark {
+    flex: none; width: 34px; height: 30px; border-radius: 2px;
+    background: var(--accent); transform: skewX(-20deg);
+  }
+  .sb-idle-text {
+    min-width: 0; overflow: hidden; white-space: nowrap;
+    font: 700 30px/1.1 var(--font-sb); text-transform: uppercase; color: #fff;
+    position: relative; top: 1px;   /* optical centre: cap height sits 1 px high in the line box */
+  }
+
+  /* logo plate: slanted, slightly lighter panel */
+  .sb-plate {
+    left: 0; width: var(--plate-w);
+    clip-path: polygon(0 0, calc(100% - var(--slant)) 0, 100% 100%, var(--slant) 100%);
+    background: linear-gradient(115deg, var(--plate-a) 0%, var(--plate-b) 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sb-plate::after { /* faint lighter diagonal strip */
+    content: ""; position: absolute; top: 0; bottom: 0; left: 28%; width: 22%;
+    background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.08), rgba(255,255,255,0));
+    transform: skewX(-28deg);
+  }
+  .abbr {
+    position: relative; z-index: 1;
+    transform: scaleX(1); padding-right: 6px;
+    font: italic 700 34px/1 var(--font-sb);
+    color: #fff; text-transform: uppercase; white-space: nowrap;
+    max-width: calc(var(--plate-w) - var(--slant) - 14px); overflow: visible;
+  }
+  .r .abbr { transform: scaleX(-1); padding: 0 0 0 6px; }
+
+  /* thin lit edge between plate and body */
+  .sb-edge {
+    left: calc(var(--plate-w) - var(--slant)); width: calc(var(--slant) + 3px);
+    clip-path: polygon(0 0, 3px 0, 100% 100%, calc(100% - 3px) 100%);
+    background: linear-gradient(180deg, var(--edge), color-mix(in srgb, var(--edge) 40%, transparent));
+  }
+
+  /* dark glass body */
+  .sb-body {
+    left: calc(var(--plate-w) - var(--slant) + 2px); right: 0;
+    clip-path: polygon(0 0, calc(100% - var(--end-slant)) 0, 100% 100%, calc(var(--slant) + 1px) 100%);
+    background: var(--glass-fill);
+  }
+  .sb-body::before { /* top bevel line, bright in the middle */
+    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px;
+    background: linear-gradient(90deg, rgba(160,215,255,.25), rgba(210,240,255,.9) 45%, rgba(160,215,255,.25));
+  }
+  .sb-body::after { /* bottom bevel line */
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, rgba(255,255,255,.12), rgba(255,255,255,.4) 50%, rgba(255,255,255,.12));
+  }
+  .orange .sb-body::before { background: linear-gradient(90deg, rgba(245,184,61,.3), rgba(255,226,150,.9) 45%, rgba(245,184,61,.3)); }
+
+  /* name + pips, toward the centre end */
+  .sb-info {
+    left: calc(var(--plate-w) + 4px); right: 30px;
+    display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
+    padding-top: 2px;
+  }
+  .r .sb-info { align-items: flex-start; transform: scaleX(-1); }
+  .l .sb-info { }
+  .sb-name {
+    max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font: 700 var(--name-size)/1.1 var(--font-sb);
+    text-transform: uppercase; color: #fff;
+    letter-spacing: 0;
+  }
+  .sb-pips { display: flex; gap: var(--pip-gap); height: 6px; align-items: center; margin-top: 13px; min-height: 6px; }
+  /* left bar: wins fill from the centre outward, so the pip row is reversed (first win = rightmost pip) */
+  .l .sb-pips { flex-direction: row-reverse; }
+  .sb-pip {
+    width: var(--pip-w); height: 6px;
+    clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+    background: var(--dim);
+    transition: background .4s;
+  }
+  .sb-pip.on { background: linear-gradient(180deg, color-mix(in srgb, var(--lit) 55%, #fff), var(--lit)); }
+
+  /* centre tab hanging below the HUD (the only element below the bars) */
+  .sb-tab {
+    position: absolute; top: var(--bar-h);
+    left: var(--cx); translate: -50% 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 38px; padding: 0 44px; min-width: 230px;
+    white-space: nowrap;
+    font: 700 22px/1 var(--font-sb); text-transform: uppercase; color: var(--tab-gold);
+    opacity: 0;
+    animation: sb-tab .6s var(--ease-out) .55s forwards;
+  }
+  .sb-tab::before, .sb-tab::after { content: ""; position: absolute; z-index: -1; }
+  .sb-tab::before { /* gold outline */
+    inset: 0; background: var(--tab-gold);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 26px) 100%, 26px 100%);
+  }
+  .sb-tab::after { /* dark fill, inset by the outline width */
+    inset: 0 2px 2px 2px;
+    background: linear-gradient(180deg, #0f2330, #07111a);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 25px) 100%, 25px 100%);
+  }
+  .sb-tab { isolation: isolate; }
+  .sb-tab:empty { display: none; }
+  @keyframes sb-tab {
+    from { opacity: 0; translate: -50% -14px; }
+    to   { opacity: 1; translate: -50% 0; }
+  }
+</style>
+<script src="config.js"></script>
+<script src="common.js"></script>
+</head>
+<body class="transparent">
+  <div class="sb-idle" id="idle"><span class="sb-idle-mark"></span><span class="sb-idle-text" id="idle-text"></span></div>
+  <div class="sb-bar l blue" id="bar-l">
+    <div class="sb-plate"><span class="abbr"></span></div>
+    <div class="sb-edge"></div>
+    <div class="sb-body"></div>
+    <div class="sb-info"><div class="sb-name"></div><div class="sb-pips"></div></div>
+  </div>
+  <div class="sb-bar r orange" id="bar-r">
+    <div class="sb-plate"><span class="abbr"></span></div>
+    <div class="sb-edge"></div>
+    <div class="sb-body"></div>
+    <div class="sb-info"><div class="sb-name"></div><div class="sb-pips"></div></div>
+  </div>
+  <div class="sb-bridge"></div>
+  <div class="sb-tab" id="tab"></div>
+
+<script>
+(function () {
+  var S = (window.STREAM && window.STREAM.scoreboard) || {};
+  var P = OV.param;
+  var demo = P("demo") === "1";
+  var base = demo ? {
+    blue: { name: "Blue Team", abbr: "BLU", wins: 1 },
+    orange: { name: "Orange Team", abbr: "ORG", wins: 0 },
+    bestOf: 5,
+    tab: "YOUR EVENT | MD1 | SERIES 1 OF 3 | GAME 2"
+  } : S;
+  var cfg = [base.blue || {}, base.orange || {}];   // index = TEAM: 0 blue, 1 orange
+  var TEAM_CLS = ["blue", "orange"];
+
+  function str(v) { return v == null ? "" : String(v).trim(); }
+  function num(v, d) { var n = parseInt(v, 10); return isNaN(n) || n < 0 ? d : n; }
+  function pick(param, fallback) { var v = P(param); return v != null ? v : fallback; }
+
+  var bestOf = num(pick("bo", base.bestOf), 3);
+  if (bestOf < 1) bestOf = 3;
+  var pipCount = Math.floor(bestOf / 2) + 1;
+
+  // ---- Per-team data (everything here follows the TEAM, not the side) ----
+  var DEF_ABBR = ["BLU", "ORG"];
+  var team = [0, 1].map(function (i) {
+    var t = cfg[i];
+    var cfgAbbr = str(pick(i ? "oa" : "ba", t.abbr));
+    return {
+      cfgName: str(pick(i ? "on" : "bn", t.name)),
+      cfgAbbr: cfgAbbr,
+      abbrLocked: P(i ? "oa" : "ba") != null || cfgAbbr.toUpperCase() !== DEF_ABBR[i],
+      wins: num(pick(i ? "ow" : "bw", t.wins), 0),
+      matchName: null   // the match name currently shown, null while the config names show
+    };
+  });
+
+  // ---- Which team is drawn on which side ----
+  // Rocket League always puts the local player's team on the LEFT. teamAt[side] = team index.
+  var ME = str((window.STREAM && window.STREAM.boost && window.STREAM.boost.me) || "").toLowerCase();
+  var meParam = str(P("me")).toLowerCase();
+  var forced = meParam === "orange" ? 1 : meParam === "blue" ? 0 : null;
+  var meTeam = forced != null ? forced : (demo ? 1 : 0);   // team on the left; demo shows the local player on orange
+  var teamAt = [meTeam, 1 - meTeam];
+
+  var bars = [document.getElementById("bar-l"), document.getElementById("bar-r")];
+  var els = bars.map(function (bar) {
+    return { bar: bar, name: bar.querySelector(".sb-name"), abbr: bar.querySelector(".abbr"), pips: bar.querySelector(".sb-pips"), shown: null };
+  });
+
+  function setAbbr(el, a) {
+    el.textContent = a;
+    el.style.display = a ? "" : "none";
+  }
+  function fit(el) {
+    el.style.fontSize = "";
+    var size = parseFloat(getComputedStyle(el).fontSize);
+    while (el.scrollWidth > el.clientWidth && size > 14) { size -= 1; el.style.fontSize = size + "px"; }
+  }
+
+  function renderPips(e, wins) {
+    var pips = e.pips, n = Math.min(wins, pipCount);
+    while (pips.children.length > pipCount) pips.removeChild(pips.lastChild);
+    while (pips.children.length < pipCount) {
+      var p = document.createElement("span");
+      p.className = "sb-pip";
+      pips.appendChild(p);
+    }
+    for (var k = 0; k < pips.children.length; k++) {
+      pips.children[k].className = "sb-pip" + (k < n ? " on" : "");
+    }
+  }
+
+  // Draw one side from the data of the team assigned to it.
+  function renderSide(side) {
+    var e = els[side], ti = teamAt[side], t = team[ti];
+    e.bar.classList.remove("blue", "orange");
+    e.bar.classList.add(TEAM_CLS[ti]);
+    var nm = t.matchName || t.cfgName;
+    var ab = t.matchName && !t.abbrLocked ? (autoAbbr(t.matchName) || t.cfgAbbr) : t.cfgAbbr;
+    var key = ti + "|" + nm + "|" + ab;
+    if (key !== e.shown) {
+      e.shown = key;
+      e.name.textContent = nm;
+      setAbbr(e.abbr, ab);
+      fit(e.name);
+    }
+    renderPips(e, t.wins);
+  }
+  function renderAll() { renderSide(0); renderSide(1); }
+
+  // Plate text for a match name: a single word of 1 to 4 letters is used as is,
+  // otherwise the first 3 letters/digits of the name with spaces and punctuation removed.
+  function autoAbbr(name) {
+    if (/^\p{L}{1,4}$/u.test(name)) return name.toUpperCase();
+    return name.replace(/[^\p{L}\p{N}]/gu, "").slice(0, 3).toUpperCase();
+  }
+
+  // Put team `left` on the left bar. A short crossfade hides the swap; no loop.
+  function setLeftTeam(left, animate) {
+    if (teamAt[0] === left) return;
+    teamAt = [left, 1 - left];
+    if (!animate || !els[0].bar.animate) { renderAll(); return; }
+    bars.forEach(function (b) { b.animate([{ opacity: 1 }, { opacity: 0 }, { opacity: 1 }], { duration: 420, easing: "ease-in-out" }); });
+    setTimeout(renderAll, 210);
+  }
+
+  var tab = document.getElementById("tab");
+  var cfgTab = str(pick("tab", base.tab));
+  tab.textContent = cfgTab;
+
+  renderAll();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { els.forEach(function (e) { fit(e.name); }); });
+
+  // ---- Live series control (scoreboard-server.js): wins, best-of and tab text ----
+  // Skipped in demo mode. If the server is unreachable nothing changes, the config.js values stay.
+  // state.blue.wins always belongs to the BLUE team, state.orange.wins to ORANGE, on whichever side they sit.
+  var SB = OV.param("sb") || "http://127.0.0.1:49125/events";
+  function applySeries(st) {
+    if (!st || typeof st !== "object") return;
+    var bo = st.bestOf;
+    if (bo !== 3 && bo !== 5 && bo !== 7) return;
+    bestOf = bo;
+    pipCount = Math.floor(bo / 2) + 1;
+    var bw = st.blue && Number.isInteger(st.blue.wins) ? st.blue.wins : 0;
+    var ow = st.orange && Number.isInteger(st.orange.wins) ? st.orange.wins : 0;
+    team[0].wins = Math.max(bw, 0);
+    team[1].wins = Math.max(ow, 0);
+    var t = typeof st.tab === "string" ? st.tab.trim() : "";
+    tab.textContent = t || cfgTab;
+    renderAll();
+  }
+  function connectSeries() {
+    try {
+      var es = new EventSource(SB);   // reconnects by itself while the server is down
+      es.onmessage = function (ev) {
+        var st; try { st = JSON.parse(ev.data); } catch (e) { return; }
+        applySeries(st);
+      };
+    } catch (e) { /* no live control, keep the config.js values */ }
+  }
+  if (!demo) connectSeries();
+
+  // ---- Idle centre panel: visible in the HUD gap when no match is live ----
+  // ?idle=1 forces it visible, ?idle=0 forces it hidden, ?demo=1 hides it (demo simulates a live match).
+  // Live is set by game events (MatchCreated, MatchInitialized, CountdownBegin, UpdateState with
+  // Players or Game) and cleared at once by MatchDestroyed, or when the relay socket closes.
+  // Safety net: live but no message of any kind for SAFETY_MS = idle. No relay = idle.
+  var idleEl = document.getElementById("idle");
+  var idleTextEl = document.getElementById("idle-text");
+  var IDLE_FORCE = P("idle");
+  var SAFETY_MS = 2500;
+  var live = false;
+  var lastMsg = 0;
+  var idleShown = null;
+  idleTextEl.textContent = str(S.idleText) || str(OV.S.event);
+  fit(idleTextEl);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { fit(idleTextEl); });
+
+  function setIdle(show) {
+    if (show === idleShown) return;
+    idleShown = show;
+    idleEl.classList.toggle("show", show);
+  }
+  function updateIdle() {
+    if (IDLE_FORCE === "1") setIdle(true);
+    else if (IDLE_FORCE === "0" || demo) setIdle(false);
+    else setIdle(!live);
+  }
+  // Called for every relay message, whatever its Event.
+  function onIdleEvent(msg) {
+    lastMsg = Date.now();
+    var ev = msg && msg.Event;
+    if (ev === "MatchDestroyed") live = false;
+    else if (ev === "MatchCreated" || ev === "MatchInitialized" || ev === "CountdownBegin") live = true;
+    else return;
+    updateIdle();
+  }
+  // Socket closed or never opened: nothing is live.
+  function relayDown() {
+    live = false;
+    lastMsg = 0;
+    updateIdle();
+  }
+  updateIdle();
+  setInterval(function () {
+    if (live && Date.now() - lastMsg > SAFETY_MS) live = false;
+    updateIdle();
+  }, 250);
+
+  // ---- Live team names and sides from the Rocket League relay (skipped in demo mode) ----
+  var autoNames = S.autoNames !== false;
+  var WS = OV.param("ws") || (OV.S.boost && OV.S.boost.relay) || "ws://127.0.0.1:49124";
+  var HOLD_MS = 10000;   // no UpdateState for this long = back to the config names
+  var lastSeen = 0;
+
+  // teams: Game.Teams from UpdateState, or null/undefined to fall back to the config
+  function applyTeams(teams) {
+    var found = [null, null];
+    if (Array.isArray(teams)) {
+      teams.forEach(function (t) {
+        if (!t || typeof t !== "object") return;
+        if (t.TeamNum !== 0 && t.TeamNum !== 1) return;
+        var n = typeof t.Name === "string" ? t.Name.trim() : "";
+        if (n) found[t.TeamNum] = n;
+      });
+    }
+    team[0].matchName = found[0];
+    team[1].matchName = found[1];
+    renderAll();
+  }
+
+  // The local player's team goes on the left; unknown (spectating, no data) = blue left.
+  function applySides(players) {
+    if (forced != null) return;
+    if (!Array.isArray(players) || !players.length) return;
+    var mine = null;
+    players.forEach(function (p) {
+      if (p && typeof p.Name === "string" && p.Name.trim().toLowerCase() === ME && (p.TeamNum === 0 || p.TeamNum === 1)) mine = p.TeamNum;
+    });
+    setLeftTeam(mine == null ? 0 : mine, true);
+  }
+
+  function onUpdate(msg) {
+    if (!msg || msg.Event !== "UpdateState") return;
+    var d = msg.Data;
+    if (typeof d === "string") { try { d = JSON.parse(d); } catch (e) { return; } }
+    if (!d || typeof d !== "object") return;
+    lastSeen = Date.now();
+    if (Array.isArray(d.Players) || (d.Game && typeof d.Game === "object")) {
+      live = true;
+      updateIdle();
+    }
+    if (!autoNames) return;   // with autoNames off the relay only drives the idle panel
+    applyTeams(d.Game && d.Game.Teams);
+    applySides(d.Players);
+  }
+
+  function connect() {
+    var ws;
+    try { ws = new WebSocket(WS); } catch (e) { relayDown(); return setTimeout(connect, 2000); }
+    ws.onmessage = function (ev) {
+      var msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
+      onIdleEvent(msg);
+      onUpdate(msg);
+    };
+    ws.onclose = function () { relayDown(); setTimeout(connect, 2000); };
+  }
+
+  if (!demo && autoNames) {
+    setInterval(function () {
+      if (lastSeen && Date.now() - lastSeen > HOLD_MS) {
+        lastSeen = 0;
+        applyTeams(null);
+        if (forced == null) setLeftTeam(0, true);
+      }
+    }, 1000);
+  }
+  if (!demo) connect();   // also feeds the idle panel when autoNames is off
+})();
+</script>
+</body>
+</html>

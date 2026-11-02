@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Lower Third</title>
+<link rel="stylesheet" href="overlay.css">
+<script src="config.js"></script>
+<script src="common.js"></script>
+</head>
+<body class="transparent">
+  <div class="l3" id="l3">
+    <div class="slab"></div>
+    <div class="body">
+      <div class="name" data-bind="name">Ali</div>
+      <div class="tag" id="l3tag"></div>
+    </div>
+  </div>
+<script>
+  (function () {
+    var l3 = document.getElementById("l3"), cfg = OV.S.lowerThird || {};
+    var h = OV.platforms.map(function (p) { return OV.esc(p.handle); }).join(" · ");
+    document.getElementById("l3tag").innerHTML = OV.esc(OV.S.tagline || "") + (h ? " <b>//</b> " + h : "");
+    var show = (cfg.showSeconds || 12) * 1000, every = (cfg.everyMinutes || 0) * 60000;
+    if (OV.param("always") === "1") { l3.classList.add("show"); return; }
+    function cycle() { l3.classList.add("show"); setTimeout(function () { l3.classList.remove("show"); }, show); }
+    setTimeout(cycle, 4000);
+    if (every > 0) setInterval(cycle, every);
+  })();
+</script>
+</body>
+</html>

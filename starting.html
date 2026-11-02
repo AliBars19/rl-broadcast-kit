@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Starting Soon</title>
+<link rel="stylesheet" href="overlay.css">
+<script src="config.js"></script>
+<script src="common.js"></script>
+</head>
+<body class="scene">
+  <div class="grid-bg"></div>
+  <header class="topbar">
+    <div class="event"><span class="event-slash"></span><span class="event-name" data-bind="event">Your Event</span></div>
+    <div class="meta"><span data-bind="game">Rocket League</span><span class="sep"></span><span data-date></span><span class="sep"></span><span data-clock>00:00</span></div>
+  </header>
+  <main class="hero">
+    <h1 class="rise d1">Starting<br><span class="hl">soon</span></h1>
+  </main>
+  <section class="tiles rise d3" data-social-tiles>
+    <div class="tile feature"><div class="label"><span class="live-dot"></span>Starting in</div><div class="value" id="cd">05:00</div><div class="bar" id="cdbar"></div></div>
+  </section>
+<script>
+  (function () {
+    var mins = parseFloat(OV.param("min")) || OV.S.startingMinutes || 5;
+    var total = Math.round(mins * 60), end = Date.now() + total * 1000;
+    var el = document.getElementById("cd"), bar = document.getElementById("cdbar");
+    function tick() {
+      var left = Math.max(0, Math.round((end - Date.now()) / 1000));
+      el.textContent = left > 0 ? OV.pad(Math.floor(left / 60)) + ":" + OV.pad(left % 60) : "ANY SEC";
+      bar.style.width = (100 * (1 - left / total)) + "%";
+      if (left > 0) setTimeout(tick, 250);
+    }
+    tick();
+  })();
+</script>
+</body>
+</html>
