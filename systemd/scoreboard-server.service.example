@@ -1,0 +1,13 @@
+# Copy to ~/.config/systemd/user/scoreboard-server.service, replace /path/to/rl-broadcast-kit with the real
+# folder, then: systemctl --user daemon-reload && systemctl --user enable --now scoreboard-server
+[Unit]
+Description=Live scoreboard control server for the overlays (localhost only)
+
+[Service]
+WorkingDirectory=/path/to/rl-broadcast-kit
+ExecStart=/usr/bin/node /path/to/rl-broadcast-kit/scoreboard-server.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scoreboard Control</title>
+<link rel="stylesheet" href="overlay.css">
+<style>
+  /* overlay.css fixes html/body at 1920x1080 for OBS sources; a dock is fluid. */
+  html, body { width: auto; height: auto; min-height: 100%; overflow: auto; background: var(--bg-app); }
+  body { margin: 0; font-family: var(--font-sans); color: var(--text); }
+  :root { --blue: #62cdff; --blue-dim: #16313f; --orange: #ffb62e; --orange-dim: #3a2f17; --ok: #3ddc84; --bad: #ff5d5d; }
+
+  .wrap { max-width: 640px; margin: 0 auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  h1 { margin: 0; font: 700 18px/1 var(--font-display); text-transform: uppercase; color: var(--text); }
+  .conn { display: flex; align-items: center; gap: 8px; font: 500 12px/1 var(--font-mono); color: var(--muted); }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--bad); }
+  .on .dot { background: var(--ok); }
+
+  .teams { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .team { background: var(--panel); border: 1px solid var(--border-strong); border-top: 4px solid var(--c); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .team.blue { --c: var(--blue); --cd: var(--blue-dim); }
+  .team.orange { --c: var(--orange); --cd: var(--orange-dim); }
+  .team h2 { margin: 0; text-align: center; font: 700 16px/1 var(--font-display); color: var(--c); text-transform: uppercase; }
+  .wins { text-align: center; font: 700 clamp(56px, 18vw, 96px)/1 var(--font-display); color: var(--text); font-variant-numeric: tabular-nums; }
+  .need { text-align: center; font: 500 12px/1 var(--font-mono); color: var(--muted); }
+  .pm { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; }
+
+  button { font: 700 18px/1 var(--font-display); color: var(--text); background: var(--panel-raised); border: 1px solid var(--border-raised); border-radius: var(--radius); min-height: 56px; cursor: pointer; touch-action: manipulation; transition: background .12s, opacity .12s; }
+  button:hover:not(:disabled) { background: #1e2635; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button:disabled { opacity: .35; cursor: not-allowed; }
+  .team .plus { background: var(--c); color: #0b0e14; border-color: var(--c); font-size: 34px; min-height: 64px; }
+  .team .plus:hover:not(:disabled) { background: var(--c); filter: brightness(1.1); }
+  .team .minus { font-size: 34px; min-height: 64px; }
+
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .label { font: 600 12px/1 var(--font-mono); color: var(--muted); text-transform: uppercase; }
+  .bo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .bo button { font-size: 26px; min-height: 60px; }
+  .bo button.active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+
+  .tabrow { display: flex; gap: 8px; }
+  input[type=text] { flex: 1; min-width: 0; min-height: 48px; padding: 0 12px; font: 500 16px var(--font-sans); color: var(--text); background: var(--inset); border: 1px solid var(--border-strong); border-radius: var(--radius); }
+  .tabrow button { min-height: 48px; padding: 0 18px; font-size: 16px; background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips button { min-height: 40px; padding: 0 12px; font: 500 14px var(--font-sans); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chips button.cur { border-color: var(--accent); color: var(--accent); }
+  .hint { font: 500 12px/1.2 var(--font-mono); color: var(--muted); }
+
+  .small { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .small button { min-height: 48px; font-size: 15px; }
+  .small button.confirm { background: var(--bad); color: #0b0e14; border-color: var(--bad); }
+
+  .legend { font: 500 11px/1.6 var(--font-mono); color: var(--muted); }
+  .legend b { color: var(--text-3); font-weight: 600; }
+  .msg { min-height: 14px; font: 500 12px/1 var(--font-mono); color: var(--bad); }
+
+  /* Program panel */
+  .readout { font: 700 40px/1 var(--font-display); color: var(--accent); font-variant-numeric: tabular-nums; text-align: center; padding: 6px 0; }
+  .readout.idle { font-size: 18px; color: var(--muted); line-height: 40px; padding: 0; }
+  .pg-grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .pg-grid4 button { min-height: 48px; font-size: 15px; padding: 0; }
+  #program .tabrow button { min-height: 48px; padding: 0 14px; font-size: 15px; }
+  #program .tabrow button.go { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  #program input[type=number] { flex: 1; min-width: 0; min-height: 48px; padding: 0 12px; font: 500 16px var(--font-sans); color: var(--text); background: var(--inset); border: 1px solid var(--border-strong); border-radius: var(--radius); }
+  #program input[type=text] { flex: none; width: 100%; }
+  #program .label { margin-top: 4px; }
+  .pg-two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pg-two > div { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  button.save { background: var(--accent); color: var(--on-accent); border-color: var(--accent); min-height: 52px; font-size: 16px; margin-top: 4px; }
+  button.save:hover:not(:disabled) { background: var(--accent-hover); }
+
+  @media (max-width: 360px) { .teams { gap: 8px; } .wrap { padding: 8px; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header>
+    <h1>Scoreboard</h1>
+    <div class="conn" id="conn"><span class="dot"></span><span id="connText">connecting</span></div>
+  </header>
+
+  <div class="teams">
+    <div class="team blue">
+      <h2>Blue</h2>
+      <div class="wins" id="bw">0</div>
+      <div class="need" id="bneed"></div>
+      <div class="pm">
+        <button class="minus" data-act="blue-" aria-label="Blue minus one win">-</button>
+        <button class="plus" data-act="blue+" aria-label="Blue plus one win">+</button>
+      </div>
+    </div>
+    <div class="team orange">
+      <h2>Orange</h2>
+      <div class="wins" id="ow">0</div>
+      <div class="need" id="oneed"></div>
+      <div class="pm">
+        <button class="minus" data-act="orange-" aria-label="Orange minus one win">-</button>
+        <button class="plus" data-act="orange+" aria-label="Orange plus one win">+</button>
+      </div>
+    </div>
+  </div>
+
+  <section>
+    <div class="label">Best of</div>
+    <div class="bo" id="bo">
+      <button data-bo="3">3</button>
+      <button data-bo="5">5</button>
+      <button data-bo="7">7</button>
+    </div>
+  </section>
+
+  <section>
+    <label class="label" for="tabIn">Series text</label>
+    <div class="tabrow">
+      <input type="text" id="tabIn" maxlength="80" autocomplete="off" placeholder="empty = use config.js text">
+      <button id="tabSave">Save</button>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="hint" id="tabHint"></div>
+  </section>
+
+  <section id="program">
+    <div class="label">Program</div>
+    <div class="readout" id="pgReadout" role="timer" aria-live="off">No countdown</div>
+    <div class="pg-grid4" id="pgQuick">
+      <button data-min="2">2:00</button>
+      <button data-min="3">3:00</button>
+      <button data-min="5">5:00</button>
+      <button data-min="10">10:00</button>
+    </div>
+    <div class="tabrow">
+      <input type="number" id="pgMin" min="0" max="120" step="1" inputmode="numeric" placeholder="minutes" aria-label="Custom countdown in minutes">
+      <button id="pgStart" class="go">Start</button>
+      <button id="pgClear">Clear</button>
+    </div>
+
+    <label class="label" for="pgStage">Stage</label>
+    <input type="text" id="pgStage" data-f="stage" maxlength="40" autocomplete="off">
+    <label class="label" for="pgHeadline">Up Next headline</label>
+    <input type="text" id="pgHeadline" data-f="headline" maxlength="70" autocomplete="off" placeholder="Auto: GAME N COMING UP!">
+    <label class="label" for="pgSubline">Up Next subline</label>
+    <input type="text" id="pgSubline" data-f="subline" maxlength="90" autocomplete="off" placeholder="Auto: SERIES 1-0 | BEST OF 5 | MATCHDAY 2">
+    <div class="pg-two">
+      <div><label class="label" for="pgBlue">First up: blue</label><input type="text" id="pgBlue" data-f="blue" maxlength="28" autocomplete="off"></div>
+      <div><label class="label" for="pgOrange">First up: orange</label><input type="text" id="pgOrange" data-f="orange" maxlength="28" autocomplete="off"></div>
+    </div>
+    <button id="pgSave" class="save">Save program</button>
+    <div class="msg" id="pgMsg" role="status"></div>
+  </section>
+
+  <div class="small">
+    <button id="swap">Swap</button>
+    <button id="reset">Reset series</button>
+  </div>
+
+  <div class="msg" id="msg" role="status"></div>
+
+  <div class="legend">
+    <b>1</b> blue +1 &nbsp; <b>2</b> orange +1 &nbsp; <b>Shift+1</b> blue -1 &nbsp; <b>Shift+2</b> orange -1<br>
+    <b>3 5 7</b> best of &nbsp; <b>S</b> swap &nbsp; <b>R</b> reset (press twice) &nbsp; <b>T</b> edit text &nbsp; <b>Esc</b> leave text
+  </div>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var state = null, connected = false, resetTimer = null, msgTimer = null;
+  var app = $("app");
+
+  function need(bo) { return Math.floor(bo / 2) + 1; }
+
+  function setConn(on) {
+    connected = on;
+    $("conn").className = "conn" + (on ? " on" : "");
+    $("connText").textContent = on ? "live" : "retrying";
+    renderDisabled();
+    document.dispatchEvent(new CustomEvent("sb-conn", { detail: on }));
+  }
+
+  function renderDisabled() {
+    var all = app.querySelectorAll("button, input");
+    for (var i = 0; i < all.length; i++) all[i].disabled = !connected || !state;
+    if (state && connected) {
+      var n = need(state.bestOf);
+      app.querySelector('[data-act="blue+"]').disabled = state.blue.wins >= n;
+      app.querySelector('[data-act="orange+"]').disabled = state.orange.wins >= n;
+      app.querySelector('[data-act="blue-"]').disabled = state.blue.wins <= 0;
+      app.querySelector('[data-act="orange-"]').disabled = state.orange.wins <= 0;
+    }
+  }
+
+  function render() {
+    if (!state) return;
+    var n = need(state.bestOf);
+    $("bw").textContent = state.blue.wins;
+    $("ow").textContent = state.orange.wins;
+    $("bneed").textContent = "of " + n + " needed";
+    $("oneed").textContent = "of " + n + " needed";
+    var bos = $("bo").children;
+    for (var i = 0; i < bos.length; i++) {
+      bos[i].className = Number(bos[i].dataset.bo) === state.bestOf ? "active" : "";
+      bos[i].setAttribute("aria-pressed", bos[i].className ? "true" : "false");
+    }
+    var inp = $("tabIn");
+    if (document.activeElement !== inp) inp.value = state.tab;
+    $("tabHint").textContent = state.tab ? "" : "Empty: the overlay shows the config.js text.";
+    var chips = $("chips");
+    while (chips.firstChild) chips.removeChild(chips.firstChild);
+    state.presets.forEach(function (p) {
+      var b = document.createElement("button");
+      b.textContent = p;
+      b.title = p;
+      if (p === state.tab) b.className = "cur";
+      b.addEventListener("click", function () { send("tab", p); });
+      chips.appendChild(b);
+    });
+    renderDisabled();
+    disarmReset();
+    document.dispatchEvent(new CustomEvent("sb-state", { detail: state }));
+  }
+
+  function flash(text) {
+    $("msg").textContent = text;
+    clearTimeout(msgTimer);
+    msgTimer = setTimeout(function () { $("msg").textContent = ""; }, 4000);
+  }
+
+  function send(action, value) {
+    var body = { action: action };
+    if (value !== undefined) body.value = value;
+    return fetch("/cmd", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      .then(function (r) {
+        if (r.ok) return null;
+        return r.json().then(function (j) { flash("Rejected: " + (j.error || r.status)); }, function () { flash("Rejected: " + r.status); });
+      })
+      .catch(function () { flash("Could not reach the server"); });
+  }
+
+  function disarmReset() {
+    clearTimeout(resetTimer);
+    resetTimer = null;
+    var b = $("reset");
+    b.className = "";
+    b.textContent = "Reset series";
+  }
+  function resetClick() {
+    if (resetTimer) { disarmReset(); send("reset"); return; }
+    var b = $("reset");
+    b.className = "confirm";
+    b.textContent = "Tap again to confirm";
+    resetTimer = setTimeout(disarmReset, 3000);
+  }
+
+  function saveTab() { send("tab", $("tabIn").value); }
+
+  app.addEventListener("click", function (e) {
+    var t = e.target.closest ? e.target.closest("button") : null;
+    if (!t || t.disabled) return;
+    if (t.dataset.act) send(t.dataset.act);
+    else if (t.dataset.bo) send("bestOf", Number(t.dataset.bo));
+  });
+  $("tabSave").addEventListener("click", saveTab);
+  $("swap").addEventListener("click", function () { send("swap"); });
+  $("reset").addEventListener("click", resetClick);
+  $("tabIn").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); saveTab(); }
+    else if (e.key === "Escape") { $("tabIn").value = state ? state.tab : ""; $("tabIn").blur(); }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    var tag = (e.target && e.target.tagName) || "";
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
+    if (!connected || !state) return;
+    var c = e.code, handled = true;
+    if (c === "Digit1") send(e.shiftKey ? "blue-" : "blue+");
+    else if (c === "Digit2") send(e.shiftKey ? "orange-" : "orange+");
+    else if (c === "Digit3") send("bestOf", 3);
+    else if (c === "Digit5") send("bestOf", 5);
+    else if (c === "Digit7") send("bestOf", 7);
+    else if (c === "KeyS") send("swap");
+    else if (c === "KeyR") resetClick();
+    else if (c === "KeyT") { $("tabIn").focus(); $("tabIn").select(); }
+    else handled = false;
+    if (handled) e.preventDefault();
+  });
+
+  function connect() {
+    var es;
+    try { es = new EventSource("/events"); } catch (e) { setConn(false); setTimeout(connect, 2000); return; }
+    es.onopen = function () { setConn(true); };
+    es.onmessage = function (ev) {
+      try { state = JSON.parse(ev.data); } catch (e) { return; }
+      setConn(true);
+      render();
+    };
+    es.onerror = function () { setConn(false); };
+  }
+  setConn(false);
+  connect();
+})();
+</script>
+<script src="control-program.js"></script>
+</body>
+</html>

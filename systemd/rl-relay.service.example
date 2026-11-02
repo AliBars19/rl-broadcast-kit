@@ -1,0 +1,13 @@
+# Copy to ~/.config/systemd/user/rl-relay.service, replace /path/to/rl-broadcast-kit with the real
+# folder, then: systemctl --user daemon-reload && systemctl --user enable --now rl-relay
+[Unit]
+Description=Rocket League Stats API relay for the boost panels (localhost only)
+
+[Service]
+WorkingDirectory=/path/to/rl-broadcast-kit
+ExecStart=/usr/bin/node /path/to/rl-broadcast-kit/rl-relay.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target
