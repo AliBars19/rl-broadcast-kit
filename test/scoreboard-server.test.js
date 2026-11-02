@@ -17,7 +17,7 @@ const run = (cmd, state) => apply(cmd, state || defaults(), NOW);
 
 test("defaults include the program object", () => {
   assert.deepStrictEqual(defaults().program, {
-    endsAt: null, label: "KICKOFF", stage: "MATCHDAY 2", headline: "", subline: "",
+    endsAt: null, label: "KICKOFF", stage: "", headline: "", subline: "",
     firstUp: { blue: "", orange: "" }
   });
 });
@@ -100,7 +100,7 @@ test("program merges a partial object and keeps the rest", () => {
   const s1 = run({ action: "program", value: { headline: "  Opening match  ", label: "NEXT GAME" } });
   assert.strictEqual(s1.program.headline, "Opening match");
   assert.strictEqual(s1.program.label, "NEXT GAME");
-  assert.strictEqual(s1.program.stage, "MATCHDAY 2");
+  assert.strictEqual(s1.program.stage, "");
   const s2 = run({ action: "program", value: { firstUp: { blue: "Hawks" } } }, s1);
   assert.deepStrictEqual(s2.program.firstUp, { blue: "Hawks", orange: "" });
   const s3 = run({ action: "program", value: { firstUp: { orange: "Owls" } } }, s2);

@@ -34,7 +34,7 @@ function defaults() {
   return {
     blue: { wins: 0 }, orange: { wins: 0 }, bestOf: 3, tab: "", presets: [],
     program: {
-      endsAt: null, label: "KICKOFF", stage: "MATCHDAY 2", headline: "", subline: "",
+      endsAt: null, label: "KICKOFF", stage: "", headline: "", subline: "",
       firstUp: { blue: "", orange: "" }
     }
   };
