@@ -1,0 +1,16 @@
+{
+  "title": "YOUR EVENT 26",
+  "subtitle": "YOUR LEAGUE",
+  "matchday": 2,
+  "opponent": "ORANGE TEAM",
+  "shots": [
+    {"source": "/path/to/replay-shot-1.mkv", "start": 1.0, "end": 3.6, "graphic": "presents"},
+    {"source": "/path/to/replay-shot-2.mkv", "start": 1.0, "end": 3.0, "graphic": null},
+    {"source": "/path/to/replay-shot-3.mkv", "start": 1.0, "end": 2.5, "speed": 0.5, "graphic": "wordmark"},
+    {"source": "/path/to/replay-shot-4.mkv", "start": 1.0, "end": 3.0, "graphic": null},
+    {"source": "/path/to/replay-shot-5.mkv", "start": 1.0, "end": 3.6, "graphic": null},
+    {"source": "/path/to/replay-shot-6.mkv", "start": 1.0, "end": 2.6, "graphic": null},
+    {"source": "/path/to/replay-shot-7.mkv", "start": 1.0, "end": 2.5, "speed": 0.5, "graphic": "matchup"},
+    {"source": "/path/to/replay-shot-8.mkv", "start": 1.0, "end": 4.6, "graphic": "lockup"}
+  ]
+}
