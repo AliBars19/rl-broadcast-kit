@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Program Lower Bar</title>
+<!-- 1920x1080 transparent page for the facecam scene. Data: state.program from the scoreboard server.
+     Test options: ?port=49135 (other server port), ?sb=<events url>, ?still=1 (no motion). -->
+<link rel="stylesheet" href="../overlay.css">
+<script src="../config.js"></script>
+<script src="../common.js"></script>
+<style>
+  :root { --bar: #0b0e14; --blue-team: #4da3ff; --orange-team: #ff7a45; --gold: #f5b83d; --dur: 400ms; }
+  body.transparent { position: relative; background: transparent; }
+  .still *, .still *::before, .still *::after { transition: none !important; animation: none !important; }
+
+  /* the bar and its handle tab ride up together on load */
+  .dock { position: absolute; left: 60px; bottom: 40px; width: 1800px; height: 110px; transform: translateY(220px); transition: transform 800ms var(--ease-out); }
+  .ready .dock { transform: none; }
+  .handle { position: absolute; left: 56px; bottom: 109px; height: 34px; padding: 0 20px; display: flex; align-items: center; background: var(--bar); border: 1px solid var(--border-strong); border-bottom: 0; border-radius: 12px 12px 0 0; font: 600 18px/1 var(--font-display); color: var(--accent); }
+  .bar { position: absolute; inset: 0; display: flex; align-items: center; gap: 22px; padding: 0 44px 0 12px; background: var(--bar); border: 1px solid var(--border-strong); border-radius: 55px; }
+  .rule { flex: none; width: 1px; height: 58px; background: var(--border-strong); }
+
+  .brand { flex: none; display: flex; align-items: center; gap: 14px; width: 270px; padding-left: 4px; }
+  .mark { flex: none; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; border-radius: 35px; background: var(--accent); color: var(--on-accent); font: 700 44px/1 var(--font-display); }
+  .brand .name { font: 700 28px/1 var(--font-display); color: var(--text); }
+  .brand .sub { width: 184px; height: 16px; margin-top: 6px; font: 600 14px/16px var(--font-display); color: var(--accent); }
+
+  .first { flex: none; width: 370px; display: flex; flex-direction: column; gap: 8px; }
+  .first .cap { font: 600 15px/1 var(--font-display); color: var(--muted); }
+  .match { display: flex; align-items: center; gap: 12px; }
+  .team { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .chip { flex: none; width: 8px; height: 30px; border-radius: 4px; }
+  .chip.b { background: var(--blue-team); }
+  .chip.o { background: var(--orange-team); }
+  .vs { flex: none; font: 600 17px/1 var(--font-display); color: var(--muted); }
+  .team .slot { height: 32px; max-width: 165px; }
+  .team .slot > span { font: 700 26px/32px var(--font-display); color: var(--text); }
+
+  .gold { flex: none; width: 240px; height: 92px; display: flex; flex-direction: column; justify-content: center; padding: 0 20px; border-radius: 43px; background: var(--gold); color: var(--on-accent); }
+  .glabelrow { display: flex; align-items: center; gap: 8px; }
+  .play { flex: none; width: 12px; height: 14px; background: var(--on-accent); clip-path: polygon(0 0, 100% 50%, 0 100%); }
+  .gold .slot { height: 20px; max-width: 190px; }
+  .gold .slot > span { font: 700 17px/20px var(--font-display); }
+  .gtime { font: 700 50px/52px var(--font-display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .gtime.long { font-size: 42px; }
+  .gold[data-mode="label"] .gtime { display: none; }
+  .gold[data-mode="label"] .play { width: 20px; height: 24px; }
+  .gold[data-mode="label"] .glabelrow { gap: 12px; }
+  .gold[data-mode="label"] .slot { height: 46px; max-width: 170px; }
+  .gold[data-mode="label"] .slot > span { font-size: 40px; line-height: 46px; }
+
+  .copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .copy .head { height: 40px; }
+  .copy .head > span { font: 700 34px/40px var(--font-display); color: var(--text); }
+  .copy .line { height: 26px; }
+  .copy .line > span { font: 500 22px/26px var(--font-sans); color: var(--text-3); }
+
+  .sponsor { flex: none; width: 170px; display: flex; align-items: center; justify-content: center; }
+  .sponsor img { display: block; height: 44px; width: auto; }
+
+  /* text slots: old text slides up and out, new text slides up and in */
+  .slot { display: grid; grid-template-columns: minmax(0, 1fr); overflow: hidden; }
+  .slot > span { grid-area: 1 / 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .slot > span.in { animation: slot-in var(--dur) var(--ease-out) both; }
+  .slot > span.out { animation: slot-out var(--dur) var(--ease) both; }
+  @keyframes slot-in { from { transform: translateY(100%); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes slot-out { from { transform: none; opacity: 1; } to { transform: translateY(-100%); opacity: 0; } }
+</style>
+</head>
+<body class="transparent">
+  <div class="dock" id="dock">
+    <div class="handle" id="handle"></div>
+    <div class="bar">
+      <div class="brand">
+        <div class="mark" id="mark"></div>
+        <div><div class="name" id="bname"></div><div class="sub slot" id="stage"></div></div>
+      </div>
+      <div class="rule"></div>
+      <div class="first">
+        <div class="cap">FIRST UP</div>
+        <div class="match">
+          <div class="team"><span class="chip b"></span><div class="slot" id="blue"></div></div>
+          <span class="vs">vs</span>
+          <div class="team"><span class="chip o"></span><div class="slot" id="orange"></div></div>
+        </div>
+      </div>
+      <div class="gold" id="gold" data-mode="label">
+        <div class="glabelrow"><span class="play"></span><div class="slot" id="label"></div></div>
+        <div class="gtime" id="time"></div>
+      </div>
+      <div class="copy">
+        <div class="slot head" id="headline"></div>
+        <div class="slot line" id="subline"></div>
+      </div>
+      <div class="rule" id="sponsorRule"></div>
+      <div class="sponsor" id="sponsorSpot"><img id="sponsorImg" alt="" src=""></div>
+    </div>
+  </div>
+<script src="lower-bar.js"></script>
+</body>
+</html>

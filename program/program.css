@@ -1,0 +1,180 @@
+/* ==========================================================================
+   Program screens: shared look (Starting Soon, Up Next, BRB, and the other
+   program pages). Deep blue field, thin curved lines, one gold ribbon, plus
+   our own pieces: navy slabs with amber rules, filled numerals. Rules: letter-spacing 0, no glow, no blur, no
+   radial gradients, motion is fade / slide / scale / translate / stroke draw only.
+   Paths are relative to this file, so pages in program/ link it directly.
+   ========================================================================== */
+
+@font-face { font-family: "Chakra Petch"; src: url("../fonts/ChakraPetch-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Chakra Petch"; src: url("../fonts/ChakraPetch-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Chakra Petch"; src: url("../fonts/ChakraPetch-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "IBM Plex Sans"; src: url("../fonts/IBMPlexSans-var.woff2") format("woff2"); font-weight: 100 700; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("../fonts/IBMPlexMono-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("../fonts/IBMPlexMono-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+
+:root {
+  --program-blue-deep: #0b1d4a;
+  --program-blue: #1b3f8f;
+  --line-1: #2f63c4;
+  --line-2: #4f86e6;
+  --gold: #f5b83d;
+  --gold-soft: #ffd27a;
+  --navy: #07090d;
+  --panel: #121722;
+  --blue: #4da3ff;
+  --orange: #ff7a45;
+  --white: #ffffff;
+  --ice: #cfe0ff;
+  --mute: #9db8f0;
+  --font-display: "Chakra Petch", "Noto Sans", "DejaVu Sans", "Bahnschrift", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", "Noto Sans", "DejaVu Sans", "Segoe UI", system-ui, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", "DejaVu Sans Mono", "Noto Sans Mono", Consolas, monospace;
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; letter-spacing: 0; }
+
+html, body {
+  margin: 0;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  color: var(--white);
+  font-family: var(--font-sans);
+  background: var(--program-blue-deep);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---- background layer (bg.html, also embedded by iframe) ---------------- */
+
+.field {
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, var(--program-blue-deep) 0%, #10286a 52%, var(--program-blue) 130%);
+}
+.field svg { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+.lines { fill: none; stroke-linecap: round; animation: drift 40s ease-in-out infinite alternate; transform-origin: 960px 540px; }
+.lines path { vector-effect: none; }
+.ribbon { stroke: var(--gold); stroke-width: 6; opacity: .95; stroke-dasharray: 1; animation: draw 2.2s var(--ease-out) .2s both; }
+.ribbon-edge { stroke: var(--gold-soft); stroke-width: 1.5; opacity: .8; stroke-dasharray: 1; animation: draw 2.2s var(--ease-out) .35s both; }
+.bracket { fill: none; stroke: var(--white); stroke-width: 2.5; opacity: .85; stroke-linecap: square; }
+
+@keyframes drift {
+  from { transform: translate(0, 0) rotate(0deg); }
+  to   { transform: translate(-46px, -28px) rotate(2.4deg); }
+}
+@keyframes draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+
+.bg-frame { position: absolute; inset: 0; width: 1920px; height: 1080px; border: 0; display: block; }
+.stage { position: absolute; inset: 0; overflow: hidden; }
+
+/* ---- entrance: staggered rise / fade (about 1.5 s in total) -------------- */
+
+.in { animation: rise .8s var(--ease-out) both; animation-delay: var(--d, 0s); }
+@keyframes rise { from { opacity: 0; translate: 0 28px; } to { opacity: 1; translate: 0 0; } }
+.in-fade { animation: fade .9s ease-out both; animation-delay: var(--d, 0s); }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---- header: wordmark, plate (sub line + stage chip), sponsor ------------ */
+
+.head { position: absolute; left: 0; right: 0; top: 40px; text-align: center; }
+.wordmark {
+  display: table; margin: 0 auto;
+  font-family: var(--font-display); font-weight: 700; font-size: 92px; line-height: 1;
+  transform: skewX(-8deg);
+  text-shadow: 5px 5px 0 var(--navy);
+}
+.wordmark .a { color: var(--gold); }
+
+/* navy slab with amber rules; the stage is an amber chip on its right end */
+.plate {
+  display: flex; width: max-content; margin: 16px auto 0;
+  background: var(--navy);
+  border-top: 4px solid var(--gold); border-bottom: 4px solid var(--gold);
+  transform: skewX(-8deg);
+}
+.plate .pt, .plate .chip { display: flex; align-items: center; font-family: var(--font-display); font-weight: 700; line-height: 1; }
+.plate .pt { padding: 12px 28px; font-size: 28px; color: var(--ice); }
+.plate .chip { padding: 12px 30px; font-size: 32px; background: var(--gold); color: var(--navy); }
+.plate .pt > span, .plate .chip > span { display: inline-block; transform: skewX(8deg); white-space: nowrap; }
+.plate .pt .a { color: var(--gold); }
+.plate .bar { display: inline-block; width: 4px; height: 26px; margin: 0 18px; background: var(--gold); vertical-align: middle; }
+
+.presented {
+  margin-top: 16px; display: flex; align-items: center; justify-content: center; gap: 16px;
+  font-family: var(--font-mono); font-weight: 600; font-size: 18px; color: var(--mute);
+}
+.presented img { height: 40px; width: auto; display: block; }
+
+/* ---- navy label slab (STREAM STARTS IN, AWAY FOR) -------------------------- */
+
+.label {
+  display: table; margin: 0 auto;
+  background: var(--navy); border-left: 8px solid var(--gold);
+  font-family: var(--font-display); font-weight: 700; font-size: 34px; line-height: 1; color: var(--white);
+  transform: skewX(-8deg);
+}
+.label span { display: block; padding: 13px 30px 13px 24px; transform: skewX(8deg); white-space: nowrap; }
+.label.gold { background: var(--gold); border-left-color: var(--navy); color: var(--navy); }
+
+/* ---- filled numerals --------------------------------------------------------- */
+
+.solid { color: var(--white); font-family: var(--font-display); font-weight: 700; text-shadow: 6px 6px 0 var(--navy); }
+.clock {
+  display: flex; justify-content: center; align-items: center;
+  font-size: 380px; line-height: 1.1;
+  transform: skewX(-8deg);
+}
+.dg { position: relative; display: block; width: .66em; height: 1.1em; overflow: hidden; }
+.dg > span { position: absolute; left: 0; right: 0; top: 0; text-align: center; }
+.dg > span.enter { animation: digIn .38s var(--ease-out) both; }
+.dg > span.leave { animation: digOut .3s ease-in both; }
+.colon { display: block; width: .3em; text-align: center; color: var(--gold); }
+@keyframes digIn  { from { transform: translateY(-55%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes digOut { from { transform: none; opacity: 1; } to { transform: translateY(55%); opacity: 0; } }
+
+/* final word shown at zero */
+.final {
+  font-size: 230px; line-height: 1.1; text-align: center; white-space: nowrap;
+  transform: skewX(-8deg);
+  animation: pop .6s var(--ease-out) both;
+}
+@keyframes pop { from { opacity: 0; transform: skewX(-8deg) scale(.9); } to { opacity: 1; transform: skewX(-8deg) scale(1); } }
+
+/* ---- promo reel -------------------------------------------------------------- */
+
+.reel { position: absolute; left: 600px; bottom: 56px; width: 720px; height: 104px; }
+.card {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; gap: 20px; padding: 0 26px;
+  background: rgba(6, 16, 46, .78);
+  border: 1px solid rgba(255, 255, 255, .22);
+  border-left: 6px solid var(--gold);
+  border-radius: 6px;
+  animation: cardIn .65s var(--ease-out) both;
+}
+.card.out { animation: cardOut .5s ease-in both; }
+.card .ctag {
+  flex: none; padding: 4px 10px; background: var(--gold); color: var(--navy);
+  font-family: var(--font-mono); font-weight: 600; font-size: 15px;
+}
+.card .ctext { min-width: 0; }
+.card .ctext b { display: block; font-family: var(--font-display); font-weight: 700; font-size: 34px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .ctext i { display: block; font-style: normal; font-size: 19px; color: var(--ice); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card img { height: 80px; width: auto; flex: none; }
+@keyframes cardIn  { from { opacity: 0; transform: translateX(70px); } to { opacity: 1; transform: none; } }
+@keyframes cardOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(-70px); } }
+.reel-ticks { position: absolute; left: 0; right: 0; bottom: -18px; display: flex; justify-content: center; gap: 8px; }
+.reel-ticks i { width: 26px; height: 3px; background: rgba(255, 255, 255, .25); transition: background .4s; }
+.reel-ticks i.on { background: var(--gold); }
+
+/* ---- progress bar along the bottom edge ------------------------------------- */
+
+.progress { position: absolute; left: 0; right: 0; bottom: 0; height: 8px; background: rgba(7, 9, 13, .55); }
+.progress i { position: absolute; inset: 0; background: var(--gold); transform-origin: left center; transform: scaleX(0); transition: transform .3s linear; }
+
+/* ---- shared text swap (stage / label changes) -------------------------------- */
+
+.swap-in { animation: swapIn .5s var(--ease-out) both; }
+@keyframes swapIn { from { opacity: 0; translate: 0 14px; } to { opacity: 1; translate: 0 0; } }

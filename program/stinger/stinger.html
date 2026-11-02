@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stinger</title>
+<!-- 1920x1080 transparent stinger, 1.3 s. Open as stinger.html?t=<seconds> to see one frame.
+     Timeline (s): panels enter 0.00-0.55, fully covered 0.55-0.78 with the mark, panels clear 0.78-1.28.
+     Rendered by tools/program/render_stinger.py. Hard edges only, letter-spacing 0, no soft effects. -->
+<style>
+@font-face { font-family: "Chakra Petch"; font-weight: 700; src: url(../../fonts/ChakraPetch-700.woff2) format("woff2"); }
+:root {
+  --navy: #07090d;
+  --blue-deep: #0b1d4a;
+  --blue: #1b3f8f;
+  --blue-bright: #4da3ff;
+  --gold: #f5b83d;
+  --text: #f1f4fa;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; letter-spacing: 0; }
+html, body { width: 1920px; height: 1080px; background: transparent; overflow: hidden; }
+body { position: relative; font-family: "Chakra Petch", sans-serif; font-weight: 700; color: var(--text); }
+.layer { position: absolute; left: -300px; top: 0; width: 2900px; height: 1080px; overflow: visible; }
+.mark { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+.word { position: absolute; left: 0; top: 410px; width: 1920px; text-align: center;
+  font-size: 200px; line-height: 1; white-space: nowrap; transform: skewX(-8deg); }
+.word .amber { color: var(--gold); }
+.rule { position: absolute; left: 560px; width: 800px; height: 6px; background: var(--gold); }
+.rule.top { top: 372px; transform-origin: left center; }
+.rule.bottom { top: 700px; transform-origin: right center; }
+.tag { position: absolute; left: 0; top: 724px; width: 1920px; text-align: center;
+  font-size: 34px; line-height: 1; color: var(--text); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div class="mark" id="mark">
+  <div class="rule top" id="ruleTop"></div>
+  <div class="word" id="word"></div>
+  <div class="rule bottom" id="ruleBottom"></div>
+</div>
+<script src="../../config.js"></script>
+<script>
+// The mark text is the channel name from config.js; its last word is amber.
+(function () {
+  var name = String((window.STREAM && window.STREAM.channel) || "YOUR CHANNEL").toUpperCase();
+  var i = name.lastIndexOf(" "), word = document.getElementById("word");
+  word.appendChild(document.createTextNode(i > 0 ? name.slice(0, i + 1) : name));
+  if (i > 0) {
+    var tail = document.createElement("span");
+    tail.className = "amber";
+    tail.textContent = name.slice(i + 1);
+    word.appendChild(tail);
+  }
+})();
+</script>
+<script src="../motion.js"></script>
+<script>
+(function () {
+  var W = 2900, H = 1080, S = 240, GOLD = 80;
+  var ENTER_FROM = -2800, EXIT_TO = 2400;
+  var ENTER_EASE = 'cubic-bezier(.55,0,.15,1)', EXIT_EASE = 'cubic-bezier(.85,0,.3,1)';
+  var LAYERS = [
+    { id: 'deep', fill: '#0b1d4a', edge: '#4da3ff', arcs: { cx: 1700, cy: 1750, r0: 520, step: 130, n: 10, gold: -1 },
+      enter: [0.00, 0.40], exit: [0.88, 1.28] },
+    { id: 'blue', fill: '#1b3f8f', edge: '#f1f4fa', arcs: { cx: 1250, cy: 1950, r0: 700, step: 120, n: 10, gold: 4 },
+      enter: [0.05, 0.45], exit: [0.83, 1.23] },
+    { id: 'navy', fill: '#07090d', edge: '#f5b83d', arcs: null, gold: true,
+      enter: [0.15, 0.55], exit: [0.78, 1.18] }
+  ];
+
+  function arcs(cfg, clipId) {
+    if (!cfg) { return ''; }
+    var out = '<g clip-path="url(#' + clipId + ')" fill="none">';
+    for (var i = 0; i < cfg.n; i++) {
+      var gold = i === cfg.gold;
+      out += '<circle cx="' + cfg.cx + '" cy="' + cfg.cy + '" r="' + (cfg.r0 + i * cfg.step) + '" stroke="' +
+        (gold ? '#f5b83d' : '#f1f4fa') + '" stroke-width="' + (gold ? 6 : 2) + '" stroke-opacity="' +
+        (gold ? 1 : 0.22) + '"/>';
+    }
+    return out + '</g>';
+  }
+
+  function build(layer) {
+    var main = S + ',0 ' + W + ',0 ' + (W - S) + ',' + H + ' 0,' + H;
+    var clip = 'clip-' + layer.id;
+    var svg = '<defs><clipPath id="' + clip + '"><polygon points="' + main + '"/></clipPath></defs>' +
+      '<polygon points="' + main + '" fill="' + layer.fill + '"/>' + arcs(layer.arcs, clip);
+    if (layer.gold) {
+      svg += '<polygon points="' + W + ',0 ' + (W + GOLD) + ',0 ' + (W - S + GOLD) + ',' + H + ' ' + (W - S) + ',' + H +
+        '" fill="#f5b83d"/><polygon points="' + (S - GOLD) + ',0 ' + S + ',0 0,' + H + ' ' + (-GOLD) + ',' + H +
+        '" fill="#f5b83d"/>';
+    }
+    // thin highlight line just inside the leading edge
+    svg += '<line x1="' + (W - 26) + '" y1="0" x2="' + (W - S - 26) + '" y2="' + H + '" stroke="' + layer.edge +
+      '" stroke-width="3" stroke-opacity="0.8"/>';
+    var el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    el.setAttribute('class', 'layer');
+    el.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    el.innerHTML = svg;
+    return el;
+  }
+
+  var stage = document.getElementById('stage');
+  LAYERS.forEach(function (layer) {
+    var el = build(layer);
+    stage.appendChild(el);
+    var from = { transform: 'translateX(' + ENTER_FROM + 'px)' };
+    var home = { transform: 'translateX(0px)' };
+    var gone = { transform: 'translateX(' + EXIT_TO + 'px)' };
+    tl.track(el, [
+      { t: layer.enter[0], p: from, e: ENTER_EASE }, { t: layer.enter[1], p: home },
+      { t: layer.exit[0], p: home, e: EXIT_EASE }, { t: layer.exit[1], p: gone }
+    ]);
+  });
+
+  var shown = { opacity: 1, transform: 'translateX(0px)' };
+  tl.track('#mark', [
+    { t: 0.44, p: { opacity: 0, transform: 'translateX(-140px)' }, e: 'out' }, { t: 0.64, p: shown },
+    { t: 0.70, p: shown, e: 'in' }, { t: 0.86, p: { opacity: 0, transform: 'translateX(220px)' } }
+  ]);
+  tl.track('#ruleTop', [{ t: 0.47, p: { transform: 'scaleX(0)' }, e: 'out' }, { t: 0.65, p: { transform: 'scaleX(1)' } }]);
+  tl.track('#ruleBottom', [{ t: 0.47, p: { transform: 'scaleX(0)' }, e: 'out' }, { t: 0.65, p: { transform: 'scaleX(1)' } }]);
+})();
+</script>
+</body>
+</html>

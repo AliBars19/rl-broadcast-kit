@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Intro: end title</title>
+<!-- End title for the finished intro (tools/program/add_end_title.py). Transparent page, 1920x1080.
+     Times are seconds after the audio hit; the tool passes {{offset}}, the gap between the hit and the
+     first overlay frame, so ?t=0 is the first frame at or after the hit.
+       0.00        dim layer starts easing in (done 0.50), title slams in (scale 1.45 to 1, settled 0.30)
+       0.45-0.85   the event line (config programDefaults.eventSub) wipes in
+       1.10-1.60   PRESENTED BY and the sponsor logo (only when a sponsor is configured) fade and rise in
+     Everything holds after 1.60; the title never fades (the picture fades to black behind it). -->
+<link rel="stylesheet" href="{{base}}intro.css">
+<style>
+:root { --ice: #cfe0ff; --mute: #9db8f0; }
+.dim { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: var(--navy); opacity: 0; }
+.group { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; }
+.wordmark { color: #ffffff; font-size: 210px; line-height: 1; white-space: nowrap; transform: skewX(-8deg) scale(1.45); text-shadow: 9px 9px 0 var(--navy); }
+.ev { display: flex; align-items: center; gap: 26px; width: max-content; margin-top: 34px; font-weight: 600; font-size: 46px;
+  line-height: 1; color: var(--ice); white-space: nowrap; clip-path: polygon(0% 0%, 0% 0%, -5% 100%, -5% 100%); }
+.ev .sep { display: block; width: 4px; height: 46px; background: var(--amber); }
+.presented { display: flex; align-items: center; gap: 22px; margin-top: 46px; font-weight: 600; font-size: 30px;
+  line-height: 1; color: var(--mute); opacity: 0; }
+.presented[hidden] { display: none; }
+.presented img { display: block; height: 130px; width: auto; }
+</style>
+</head>
+<body>
+<div class="fill">
+  <div class="dim" id="dim"></div>
+  <div class="group">
+    <div class="wordmark" id="wordmark">{{raw:wordmark}}</div>
+    <div class="ev" id="ev">{{raw:event_line}}</div>
+    <div class="presented" id="presented" {{raw:presented_attr}}><span>PRESENTED BY</span><img alt="" src="{{sponsor_logo}}"></div>
+  </div>
+</div>
+<script src="{{base}}../motion.js"></script>
+<script>
+// Times in this page are hit-relative; the renderer's t is shifted by the offset below.
+var OFFSET = parseFloat('{{offset}}');
+var scrub = window.setT;
+window.setT = function (seconds) { scrub(seconds + OFFSET); };
+
+tl.track('#dim', [{ t: 0.00, p: { opacity: 0 }, e: 'out' }, { t: 0.50, p: { opacity: 0.6 } }]);
+tl.track('#wordmark', [
+  { t: 0.00, p: { opacity: 1, transform: 'skewX(-8deg) scale(1.45)' }, e: 'slam' },
+  { t: 0.18, p: { opacity: 1, transform: 'skewX(-8deg) scale(0.97)' }, e: 'out' },
+  { t: 0.30, p: { opacity: 1, transform: 'skewX(-8deg) scale(1)' } }
+]);
+tl.wipe('#ev', 0.45, 0.85);
+tl.track('#presented', [
+  { t: 1.10, p: { opacity: 0, transform: 'translateY(24px)' }, e: 'out' },
+  { t: 1.60, p: { opacity: 1, transform: 'translateY(0px)' } }
+]);
+</script>
+</body>
+</html>

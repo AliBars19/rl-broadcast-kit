@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Intro: final lockup</title>
+<!-- Timeline (s): flat darkening layer fades in 0.00-0.40, brackets draw 0.10-0.70, title slams 0.30-0.50
+     (hit at 0.30), subtitle wipes 0.60-0.90, rule draws 0.80-1.20, matchday block wipes 0.95-1.30, then holds.
+     The builder fades the picture to black over the last 0.5 s. ?t=<seconds> shows one frame. -->
+<link rel="stylesheet" href="{{base}}intro.css">
+<style>
+.dim { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: var(--navy); opacity: 0; }
+.brackets { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+.title { top: 300px; font-size: {{title_size}}px; line-height: 1; }
+.sub-row { position: absolute; left: 0; top: 520px; width: 1920px; display: flex; justify-content: center; }
+.sub-block { background: var(--blue-team); color: var(--text); font-size: {{subtitle_size}}px; line-height: 1;
+  padding: 16px 52px; clip-path: polygon(22px 0, 100% 0, calc(100% - 22px) 100%, 0 100%); }
+.rule-row { position: absolute; left: 0; top: 650px; width: 1920px; height: 6px; }
+.rule { position: absolute; left: 510px; top: 0; width: 900px; height: 6px; background: var(--amber); transform-origin: left center; }
+.md-row { position: absolute; left: 0; top: 700px; width: 1920px; display: flex; justify-content: center; }
+.md-block { background: var(--amber); color: var(--navy); font-size: 100px; line-height: 1;
+  padding: 20px 80px; clip-path: polygon(40px 0, 100% 0, calc(100% - 40px) 100%, 0 100%); }
+.credit { top: 930px; font-size: 30px; line-height: 1; color: var(--text); }
+</style>
+</head>
+<body>
+<div class="fill">
+  <div class="dim" id="dim"></div>
+  <svg class="brackets" viewBox="0 0 1920 1080" fill="none" stroke="#f1f4fa" stroke-width="4">
+    <path id="b1" pathLength="1" d="M90 210 V90 H210"/>
+    <path id="b2" pathLength="1" d="M1710 90 H1830 V210"/>
+    <path id="b3" pathLength="1" d="M1830 870 V990 H1710"/>
+    <path id="b4" pathLength="1" d="M210 990 H90 V870"/>
+  </svg>
+  <div class="abs centered title slant" id="title">{{title}}</div>
+  <div class="sub-row"><div class="sub-block mono" id="sub">{{subtitle}}</div></div>
+  <div class="rule-row"><div class="rule" id="rule"></div></div>
+  <div class="md-row"><div class="md-block" id="md">MATCHDAY {{matchday}}</div></div>
+  <div class="abs centered credit mono" id="credit">{{channel}}</div>
+</div>
+<script src="{{base}}../motion.js"></script>
+<script>
+tl.track('#dim', [{ t: 0.00, p: { opacity: 0 }, e: 'linear' }, { t: 0.40, p: { opacity: 0.62 } }]);
+['b1', 'b2', 'b3', 'b4'].forEach(function (id, i) {
+  var el = document.getElementById(id);
+  el.style.strokeDasharray = '1 1';
+  tl.track(el, [{ t: 0.10 + i * 0.05, p: { strokeDashoffset: 1 }, e: 'out' }, { t: 0.65 + i * 0.02, p: { strokeDashoffset: 0 } }]);
+});
+var rest = { opacity: 1, transform: 'skewX(-8deg) scale(1)' };
+tl.track('#title', [{ t: 0.30, p: { opacity: 0, transform: 'skewX(-8deg) scale(1.5)' }, e: 'slam' }, { t: 0.50, p: rest }]);
+tl.wipe('#sub', 0.60, 0.90);
+tl.track('#rule', [{ t: 0.80, p: { transform: 'scaleX(0)' }, e: 'out' }, { t: 1.20, p: { transform: 'scaleX(1)' } }]);
+tl.wipe('#md', 0.95, 1.30);
+tl.track('#credit', [{ t: 1.20, p: { opacity: 0 }, e: 'linear' }, { t: 1.60, p: { opacity: 0.8 } }]);
+</script>
+</body>
+</html>

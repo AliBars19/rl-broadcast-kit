@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Intro: channel presents</title>
+<!-- Timeline (s): band wipes in 0.00-0.45, words slide up 0.30-0.75, hold, clear 1.95-2.40. ?t=<seconds> shows one frame. -->
+<link rel="stylesheet" href="{{base}}intro.css">
+<style>
+.band-main { top: 410px; height: 260px; background: var(--navy); }
+.band-blue { top: 392px; height: 18px; background: var(--blue-team); }
+.band-gold { top: 670px; height: 10px; background: var(--amber); }
+.words { top: 450px; height: 180px; font-size: 150px; line-height: 180px; }
+.word { display: inline-block; overflow: hidden; vertical-align: top; height: 180px; }
+.word span { display: inline-block; }
+</style>
+</head>
+<body>
+<div class="fill" id="wrap">
+  <div class="band band-blue" id="blue"></div>
+  <div class="band band-main" id="main"></div>
+  <div class="band band-gold" id="gold"></div>
+  <div class="abs centered words slant" id="words">
+    <span class="word"><span id="w1">{{channel}}</span></span>
+    <span class="word amber"><span id="w2">PRESENTS</span></span>
+  </div>
+</div>
+<script src="{{base}}../motion.js"></script>
+<script>
+tl.wipe('#main', 0.00, 0.45, 1.95, 2.40);
+tl.wipe('#blue', 0.06, 0.50, 1.90, 2.35);
+tl.wipe('#gold', 0.12, 0.56, 1.85, 2.30);
+var up = { transform: 'translateY(110%)' }, home = { transform: 'translateY(0%)' };
+tl.track('#w1', [{ t: 0.30, p: up, e: 'out' }, { t: 0.72, p: home }]);
+tl.track('#w2', [{ t: 0.42, p: up, e: 'out' }, { t: 0.84, p: home }]);
+tl.track('#words', [{ t: 1.90, p: { opacity: 1 }, e: 'in' }, { t: 2.15, p: { opacity: 0 } }]);
+</script>
+</body>
+</html>

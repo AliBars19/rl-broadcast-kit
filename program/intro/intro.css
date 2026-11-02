@@ -1,0 +1,36 @@
+/* Shared styles for the intro overlays (1920x1080, transparent background).
+   Flat hard-edged shapes only: letter-spacing 0 and no soft effects. */
+@font-face { font-family: "Chakra Petch"; font-weight: 700; src: url(../../fonts/ChakraPetch-700.woff2) format("woff2"); }
+@font-face { font-family: "Chakra Petch"; font-weight: 600; src: url(../../fonts/ChakraPetch-600.woff2) format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 600; src: url(../../fonts/IBMPlexMono-600.woff2) format("woff2"); }
+
+:root {
+  --navy: #07090d;
+  --panel: #121722;
+  --blue-deep: #0b1d4a;
+  --blue-team: #1b3f8f;
+  --blue: #4da3ff;
+  --amber: #f5b83d;
+  --orange: #ff7a45;
+  --text: #f1f4fa;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; letter-spacing: 0; }
+html, body { width: 1920px; height: 1080px; background: transparent; overflow: hidden; }
+body { position: relative; font-family: "Chakra Petch", sans-serif; font-weight: 700; color: var(--text);
+  text-transform: uppercase; }
+
+.abs { position: absolute; }
+.fill { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+.centered { left: 0; width: 1920px; text-align: center; white-space: nowrap; }
+.slant { transform: skewX(-8deg); }
+.mono { font-family: "IBM Plex Mono", monospace; font-weight: 600; }
+.amber { color: var(--amber); }
+.navy { color: var(--navy); }
+.blue { color: var(--blue); }
+.orange { color: var(--orange); }
+
+.band { position: absolute; left: 0; width: 1920px; }
+.line { position: absolute; background: var(--amber); }
+.hair { position: absolute; background: var(--blue); }
+.clip { overflow: hidden; }

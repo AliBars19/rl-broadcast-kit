@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Intro: presented by</title>
+<!-- Timeline (s): panel wipes in 0.00-0.45, label and logo slide in 0.30-0.80, hold, clear 1.90-2.35.
+     ?t=<seconds> shows one frame. -->
+<link rel="stylesheet" href="{{base}}intro.css">
+<style>
+.panel { top: 380px; height: 320px; background: var(--navy); }
+.rim { top: 366px; height: 14px; background: var(--blue-team); }
+.foot { top: 700px; height: 10px; background: var(--amber); }
+.label { top: 428px; font-size: 44px; line-height: 1; color: var(--amber); }
+.clipbox { position: absolute; left: 560px; top: 500px; width: 800px; height: 170px; overflow: hidden; }
+.logo { position: absolute; left: 80px; top: 0; width: 640px; height: 170px; object-fit: contain; }
+</style>
+</head>
+<body>
+<div class="fill" id="wrap">
+  <div class="band rim" id="rim"></div>
+  <div class="band panel" id="panel"></div>
+  <div class="band foot" id="foot"></div>
+  <div class="abs centered label mono" id="label">PRESENTED BY</div>
+  <div class="clipbox"><img class="logo" id="logo" src="{{sponsor_logo}}" alt=""></div>
+</div>
+<script src="{{base}}../motion.js"></script>
+<script>
+tl.wipe('#panel', 0.00, 0.45);
+tl.wipe('#rim', 0.06, 0.50);
+tl.wipe('#foot', 0.12, 0.56);
+tl.track('#label', [{ t: 0.30, p: { opacity: 0, transform: 'translateX(-80px)' }, e: 'out' },
+  { t: 0.62, p: { opacity: 1, transform: 'translateX(0px)' } }]);
+tl.track('#logo', [{ t: 0.42, p: { transform: 'translateY(100%)' }, e: 'out' }, { t: 0.80, p: { transform: 'translateY(0%)' } }]);
+tl.wipe('#wrap', 0.00, 0.01, 1.90, 2.35);
+</script>
+</body>
+</html>

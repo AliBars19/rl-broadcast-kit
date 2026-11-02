@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Intro: matchup card</title>
+<!-- Timeline (s): panels slide in from both sides 0.00-0.50, names fade in 0.35-0.70, VS pops 0.45-0.70,
+     hold, panels slide out 2.50-3.00. ?t=<seconds> shows one frame. -->
+<link rel="stylesheet" href="{{base}}intro.css">
+<style>
+.team { position: absolute; top: 390px; height: 300px; }
+.left { left: 0; width: 1010px; background: var(--blue-team);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 80px) 100%, 0 100%); }
+.right { left: 910px; width: 1010px; background: var(--orange);
+  clip-path: polygon(80px 0, 100% 0, 100% 100%, 0 100%); }
+.edge { position: absolute; top: 690px; height: 10px; background: var(--amber); }
+.edge.l { left: 0; width: 930px; }
+.edge.r { left: 990px; width: 930px; }
+.tag { position: absolute; top: 424px; font-size: 32px; line-height: 1; }
+.name { position: absolute; top: 500px; line-height: 1; white-space: nowrap; }
+.name.l { left: 90px; width: 780px; font-size: {{home_size}}px; }
+.name.r { left: 1050px; width: 780px; font-size: {{opponent_size}}px; text-align: right; color: var(--navy); }
+.tag.l { left: 90px; color: var(--amber); }
+.tag.r { left: 1050px; width: 780px; text-align: right; color: var(--navy); }
+.vs { position: absolute; left: 825px; top: 380px; width: 270px; height: 320px; background: var(--navy);
+  clip-path: polygon(40px 0, 100% 0, calc(100% - 40px) 100%, 0 100%); }
+.vs-text { position: absolute; left: 825px; top: 430px; width: 270px; text-align: center; font-size: 150px;
+  line-height: 1; color: var(--amber); }
+</style>
+</head>
+<body>
+<div class="fill" id="wrap">
+  <div class="abs" id="gl" style="left:0;top:0"><div class="team left"></div><div class="edge l"></div></div>
+  <div class="abs" id="gr" style="left:0;top:0"><div class="team right"></div><div class="edge r"></div></div>
+  <div class="tag l mono" id="tagl">HOME</div>
+  <div class="name l" id="namel">{{home}}</div>
+  <div class="tag r mono" id="tagr">AWAY</div>
+  <div class="name r" id="namer">{{opponent}}</div>
+  <div class="vs" id="vs"></div>
+  <div class="vs-text slant" id="vst">VS</div>
+</div>
+<script src="{{base}}../motion.js"></script>
+<script>
+var zero = { transform: 'translateX(0px)' };
+tl.track('#gl', [{ t: 0.00, p: { transform: 'translateX(-1100px)' }, e: 'out' }, { t: 0.50, p: zero },
+  { t: 2.50, p: zero, e: 'in' }, { t: 3.00, p: { transform: 'translateX(-1100px)' } }]);
+tl.track('#gr', [{ t: 0.04, p: { transform: 'translateX(1100px)' }, e: 'out' }, { t: 0.54, p: zero },
+  { t: 2.50, p: zero, e: 'in' }, { t: 3.00, p: { transform: 'translateX(1100px)' } }]);
+['#tagl', '#namel', '#tagr', '#namer'].forEach(function (id, i) {
+  var from = { opacity: 0, transform: 'translateY(24px)' }, to = { opacity: 1, transform: 'translateY(0px)' };
+  var gone = { opacity: 0, transform: 'translateY(0px)' };
+  tl.track(id, [{ t: 0.35 + (i % 2) * 0.08, p: from, e: 'out' }, { t: 0.68 + (i % 2) * 0.08, p: to },
+    { t: 2.40, p: to, e: 'in' }, { t: 2.65, p: gone }]);
+});
+var pop0 = { opacity: 0, transform: 'scale(0.4)' }, pop1 = { opacity: 1, transform: 'scale(1)' };
+tl.track('#vs', [{ t: 0.45, p: pop0, e: 'slam' }, { t: 0.68, p: pop1 }, { t: 2.45, p: pop1, e: 'in' }, { t: 2.75, p: pop0 }]);
+tl.track('#vst', [{ t: 0.50, p: { opacity: 0, transform: 'skewX(-8deg) scale(0.4)' }, e: 'slam' },
+  { t: 0.72, p: { opacity: 1, transform: 'skewX(-8deg) scale(1)' } },
+  { t: 2.45, p: { opacity: 1, transform: 'skewX(-8deg) scale(1)' }, e: 'in' },
+  { t: 2.75, p: { opacity: 0, transform: 'skewX(-8deg) scale(0.4)' } }]);
+</script>
+</body>
+</html>

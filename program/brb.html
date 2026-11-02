@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Program: Be Right Back</title>
+<link rel="stylesheet" href="program.css">
+<script src="../config.js"></script>
+<script src="../common.js"></script>
+<script src="program.js"></script>
+<style>
+  .head .wordmark { font-size: 72px; }
+  .brb { position: absolute; left: 0; right: 0; top: 330px; text-align: center; font-size: 200px; line-height: 1.1; white-space: nowrap; transform: skewX(-8deg); }
+  .away { position: absolute; left: 0; right: 0; top: 610px; display: flex; justify-content: center; align-items: center; gap: 36px; }
+  .away .label { margin: 0; font-size: 50px; }
+  .away .label span { padding: 14px 30px 14px 24px; }
+  .away .clock { font-size: 150px; line-height: 1.1; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <iframe class="bg-frame in-fade" src="bg.html" title="" tabindex="-1"></iframe>
+
+  <div class="head">
+    <div class="wordmark in" style="--d:.15s" id="wordmark"></div>
+    <div class="plate in" style="--d:.3s"><div class="pt"><span id="subline"></span></div><div class="chip"><span id="stage"></span></div></div>
+    <div class="presented in" style="--d:.45s"><span>PRESENTED BY</span><img id="sponsor" alt="" src=""></div>
+  </div>
+
+  <div class="brb solid in" style="--d:.5s">BE RIGHT BACK</div>
+  <div class="away in" style="--d:.9s"><div class="label gold"><span>AWAY FOR</span></div><div class="clock solid" id="clock"></div></div>
+
+  <div class="reel in" style="--d:1.1s" id="reel"></div>
+</div>
+
+<script>
+/* OBS: tick "Refresh browser when scene becomes active" on this source, so the
+   away timer restarts from 00:00 each time the BRB scene is shown. */
+(function () {
+  var S = PROG.S, DEF = PROG.DEF;
+  var $ = function (id) { return document.getElementById(id); };
+  var clock = PROG.makeClock($("clock"));
+  var started = Date.now();
+
+  PROG.fillWordmark($("wordmark"));
+  PROG.fillSub($("subline"), DEF.eventSub || "YOUR LEAGUE | ROCKET LEAGUE");
+  PROG.fillSponsor($("sponsor"));
+  PROG.makeReel($("reel"), S.promos, 8000);
+
+  function tick() { clock.set(PROG.mmss((Date.now() - started) / 1000)); }
+  tick();
+  setInterval(tick, 200);
+
+  var state = null;  // last good state is kept while the feed is down
+  function onState(st) {
+    if (st) state = st;
+    PROG.setText($("stage"), PROG.stageOf(state).toUpperCase());
+  }
+  onState(null);
+  PROG.connect(onState);
+  PROG.finishEntrances(3600);
+})();
+</script>
+</body>
+</html>

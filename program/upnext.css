@@ -1,0 +1,65 @@
+/* ==========================================================================
+   Program screens: UP NEXT (program/upnext.html). Full screen: blue field, wordmark in the
+   middle, one dark bar along the bottom. Rules: letter-spacing 0, no glow, no blurred shadows,
+   no radial gradients; motion is fade / slide only. Loads after program.css.
+   ========================================================================== */
+
+:root { --bar: #0b0e14; --rule: rgba(255, 255, 255, .12); --dur: 400ms; }
+
+/* wordmark and sponsor, centred in the space above the bar (0 to 920 px) */
+.hero { position: absolute; left: 0; right: 0; top: 0; height: 920px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.hero .wordmark { font-size: 176px; text-shadow: 8px 8px 0 var(--navy); }
+.hero .presented { margin-top: 40px; gap: 22px; font-family: var(--font-display); font-weight: 600; font-size: 28px; }
+.hero .presented img { height: 130px; }
+
+/* the bar: 60 px from the sides, 40 px from the bottom, 120 px tall; slides up on load */
+.dock { position: absolute; left: 60px; bottom: 40px; width: 1800px; height: 120px; animation: barUp .9s var(--ease-out) .35s both; }
+@keyframes barUp { from { translate: 0 220px; } to { translate: 0 0; } }
+.bar { position: absolute; inset: 0; display: flex; align-items: stretch; overflow: hidden; background: var(--bar); border: 1px solid var(--rule); border-radius: 8px; }
+.blk { flex: none; display: flex; align-items: center; border-left: 1px solid var(--rule); }
+.blk:first-child { border-left: 0; }
+
+.brand { width: 250px; gap: 16px; padding: 0 24px; }
+.mark { flex: none; width: 72px; height: 72px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: var(--gold); color: var(--navy); font: 700 50px/1 var(--font-display); }
+.bname { font: 700 26px/1 var(--font-display); color: var(--white); }
+
+.next { width: 620px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 10px; padding: 0 30px; border-left: 0; border-right: 1px solid var(--rule); }
+.next .cap { font: 600 17px/1 var(--font-display); color: var(--mute); }
+.match { display: flex; align-items: center; gap: 14px; max-width: 100%; }
+.team { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.chip { flex: none; width: 8px; height: 34px; border-radius: 3px; }
+.chip.b { background: var(--blue); }
+.chip.o { background: var(--orange); }
+.vs { flex: none; font: 600 18px/1 var(--font-display); color: var(--mute); }
+.team .slot { height: 38px; max-width: 250px; }
+.team .slot > span { font: 700 30px/38px var(--font-display); color: var(--white); }
+
+/* gold block: BACK IN countdown, or GAME N */
+.gold { flex: none; width: 280px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--gold); color: var(--navy); }
+.grow { display: none; align-items: center; gap: 9px; }
+.gcap { font: 700 18px/1 var(--font-display); }
+.play { flex: none; width: 13px; height: 16px; background: var(--navy); clip-path: polygon(0 0, 100% 50%, 0 100%); }
+.gtime { display: none; margin-top: 4px; font: 700 62px/66px var(--font-display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gtime.long { font-size: 50px; }
+.gold .ggame { display: none; height: 64px; max-width: 250px; }
+.gold .ggame > span { font: 700 54px/64px var(--font-display); text-align: center; }
+.gold[data-mode="timer"] .grow { display: flex; }
+.gold[data-mode="timer"] .gtime { display: block; }
+.gold[data-mode="game"] .ggame { display: grid; }
+
+.copy { flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px; padding: 0 28px; border-left: 0; }
+.copy .hl { width: 100%; height: 42px; }
+.copy .hl > span { font: 700 36px/42px var(--font-display); color: var(--white); }
+.copy .line { width: 100%; height: 28px; }
+.copy .line > span { font: 500 22px/28px var(--font-sans); color: var(--ice); }
+
+.sponsor { width: 200px; justify-content: center; }
+.sponsor img { display: block; height: 44px; width: auto; }
+
+/* text slots: old text slides up and out, new text slides up and in */
+.slot { display: grid; grid-template-columns: minmax(0, 1fr); overflow: hidden; }
+.slot > span { grid-area: 1 / 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot > span.in { animation: slot-in var(--dur) var(--ease-out) both; }
+.slot > span.out { animation: slot-out var(--dur) cubic-bezier(.4, 0, .2, 1) both; }
+@keyframes slot-in { from { transform: translateY(100%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes slot-out { from { transform: none; opacity: 1; } to { transform: translateY(-100%); opacity: 0; } }

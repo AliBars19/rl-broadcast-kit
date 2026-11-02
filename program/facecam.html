@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Program: Facecam</title>
+<!--
+  Facecam scene, one opaque 1920x1080 Browser Source (Local file, 1920x1080, FPS 60, position 0, 0).
+  It replaces Facecam - Background, Frame, Top Bar and Socials in one source.
+
+  CAMERA SLOT (put the camera source ABOVE this page in OBS, then crop to fill):
+    x 56, y 153, w 1376, h 774   (16:9, right edge 1432, bottom edge 927)
+  The slot itself is a plain dark fill that the camera covers; the amber line hugs it from outside
+  and the white corner brackets sit 10 px outside that.
+
+  Data: team names, wins, best of and stage come from the scoreboard helper (program.firstUp,
+  blue.wins, orange.wins, bestOf, program.stage) and fall back to config.js. ?sb=<events url> points
+  at another helper address.
+-->
+<link rel="stylesheet" href="program.css">
+<script src="../config.js"></script>
+<script src="../common.js"></script>
+<script src="program.js"></script>
+<script src="facecam.js" defer></script>
+<style>
+  /* ---- camera slot: x 56, y 153, 1376x774 ---- */
+  .slot { position: absolute; left: 56px; top: 153px; width: 1376px; height: 774px; background: #0a0f1b; }
+  .slot-line { position: absolute; left: 54px; top: 151px; width: 1380px; height: 778px; border: 2px solid var(--gold); pointer-events: none; }
+  .br { position: absolute; width: 46px; height: 46px; border: 0 solid var(--white); opacity: .9; }
+  .br.tl { left: 44px; top: 141px; border-top-width: 2.5px; border-left-width: 2.5px; }
+  .br.tr { left: 1390px; top: 141px; border-top-width: 2.5px; border-right-width: 2.5px; }
+  .br.bl { left: 44px; top: 893px; border-bottom-width: 2.5px; border-left-width: 2.5px; }
+  .br.brr { left: 1390px; top: 893px; border-bottom-width: 2.5px; border-right-width: 2.5px; }
+
+  /* ---- side column: x 1472..1872, aligned to the slot's top and bottom ---- */
+  .col { position: absolute; left: 1472px; top: 153px; width: 400px; height: 774px; display: flex; flex-direction: column; gap: 22px; }
+
+  .wm { font-family: var(--font-display); font-weight: 700; font-size: 54px; line-height: 1; white-space: nowrap; transform: skewX(-8deg); transform-origin: left center; }
+  .wm .a { color: var(--gold); }
+  .wm-sub { margin-top: 10px; font-family: var(--font-mono); font-weight: 600; font-size: 16px; color: var(--ice); }
+
+  .stagechip { margin: 0 6px; display: flex; align-items: center; gap: 14px; padding: 0 22px; height: 64px; background: var(--gold); color: var(--navy); transform: skewX(-8deg); }
+  .stagechip small { transform: skewX(8deg); font-family: var(--font-mono); font-weight: 600; font-size: 15px; }
+  .stagechip b { display: block; transform: skewX(8deg); font-family: var(--font-display); font-weight: 700; font-size: 36px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+  .panel { background: var(--panel); border: 1px solid rgba(255, 255, 255, .14); border-top: 3px solid var(--gold); border-radius: 6px; }
+
+  .series { padding: 16px 18px 10px; }
+  .series .meta { display: flex; justify-content: space-between; font-family: var(--font-mono); font-weight: 600; font-size: 17px; color: var(--gold); }
+  .series .row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid rgba(255, 255, 255, .1); margin-top: 10px; }
+  .series .row + .row { margin-top: 0; }
+  .series .bar { flex: none; width: 6px; align-self: stretch; }
+  .series .blue .bar { background: var(--blue); }
+  .series .orange .bar { background: var(--orange); }
+  .series .who { flex: 1; min-width: 0; }
+  .series .who b { display: block; font-family: var(--font-display); font-weight: 700; font-size: 32px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pips { margin-top: 8px; display: flex; gap: 6px; }
+  .pips i { width: 34px; height: 8px; background: rgba(255, 255, 255, .2); }
+  .blue .pips i.on { background: var(--blue); }
+  .orange .pips i.on { background: var(--orange); }
+  .series .wins { flex: none; font-family: var(--font-display); font-weight: 700; font-size: 64px; line-height: 1; min-width: 44px; text-align: right; }
+
+  .socials { display: flex; flex-direction: column; gap: 12px; }
+  .social { display: flex; flex-direction: column; gap: 4px; padding: 14px 20px 16px; }
+  .social small { font-family: var(--font-mono); font-weight: 600; font-size: 16px; color: var(--mute); }
+  .social b { font-family: var(--font-display); font-weight: 700; font-size: 44px; line-height: 1.1; }
+
+  .presented { margin-top: auto; justify-content: flex-start; }
+  .presented img { height: 46px; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <iframe class="bg-frame in-fade" src="bg.html" title="" tabindex="-1"></iframe>
+
+  <div class="slot"></div>
+  <div class="slot-line in-fade" style="--d:.3s"></div>
+  <i class="br tl in-fade" style="--d:.4s"></i><i class="br tr in-fade" style="--d:.4s"></i>
+  <i class="br bl in-fade" style="--d:.4s"></i><i class="br brr in-fade" style="--d:.4s"></i>
+
+  <div class="col">
+    <div class="in" style="--d:.15s">
+      <div class="wm" id="wordmark"></div>
+      <div class="wm-sub" id="eventSub"></div>
+    </div>
+
+    <div class="stagechip in" style="--d:.3s"><small>STAGE</small><b id="stage"></b></div>
+
+    <div class="panel series in" style="--d:.45s">
+      <div class="meta"><span id="gameN">GAME 1</span><span id="boN">BEST OF 3</span></div>
+      <div class="row blue"><i class="bar"></i><div class="who"><b id="nameB">BLUE</b><div class="pips" id="pipsB"></div></div><div class="wins" id="winsB">0</div></div>
+      <div class="row orange"><i class="bar"></i><div class="who"><b id="nameO">ORANGE</b><div class="pips" id="pipsO"></div></div><div class="wins" id="winsO">0</div></div>
+    </div>
+
+    <div class="socials in" style="--d:.6s" id="socials"></div>
+
+    <div class="presented in" style="--d:.75s"><span>PRESENTED BY</span><img id="sponsor" alt="" src=""></div>
+  </div>
+</div>
+</body>
+</html>

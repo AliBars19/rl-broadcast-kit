@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Program: Background</title>
+<link rel="stylesheet" href="program.css">
+</head>
+<body>
+<!-- Shared background for every program screen. 1920x1080, opaque.
+     Curved lines are arcs of nested circles centred off the frame (lower right).
+     The line group drifts slowly (alternate, so the loop has no seam). -->
+<div class="field">
+  <svg viewBox="0 0 1920 1080" width="1920" height="1080" aria-hidden="true">
+    <g class="lines">
+      <path d="M1870 1500A430 430 0 0 1 2340 1072" stroke="#2f63c4" stroke-width="1.5" opacity="0.4"/>
+      <path d="M1847 1499A458 458 0 0 1 2339 1048" stroke="#3d74d8" stroke-width="2.4" opacity="0.3"/>
+      <path d="M1827 1500A483 483 0 0 1 2339 1026" stroke="#4f86e6" stroke-width="2.4" opacity="0.5"/>
+      <path d="M1805 1500A510 510 0 0 1 2340 1002" stroke="#2a56ad" stroke-width="2" opacity="0.31"/>
+      <path d="M1783 1499A537 537 0 0 1 2340 979" stroke="#2f63c4" stroke-width="2" opacity="0.31"/>
+      <path d="M1761 1499A564 564 0 0 1 2340 956" stroke="#3d74d8" stroke-width="1.5" opacity="0.49"/>
+      <path d="M1733 1499A598 598 0 0 1 2339 926" stroke="#4f86e6" stroke-width="1.2" opacity="0.5"/>
+      <path d="M1705 1499A631 631 0 0 1 2339 897" stroke="#2a56ad" stroke-width="1.5" opacity="0.43"/>
+      <path d="M1680 1500A660 660 0 0 1 2340 872" stroke="#2f63c4" stroke-width="1.5" opacity="0.61"/>
+      <path d="M1652 1500A694 694 0 0 1 2339 842" stroke="#3d74d8" stroke-width="2.4" opacity="0.49"/>
+      <path d="M1624 1499A727 727 0 0 1 2340 813" stroke="#4f86e6" stroke-width="1.5" opacity="0.59"/>
+      <path d="M1598 1499A759 759 0 0 1 2339 785" stroke="#2a56ad" stroke-width="1.5" opacity="0.5"/>
+      <path d="M1568 1500A794 794 0 0 1 2339 754" stroke="#2f63c4" stroke-width="1.2" opacity="0.49"/>
+      <path d="M1535 1500A831 831 0 0 1 2339 721" stroke="#3d74d8" stroke-width="2" opacity="0.52"/>
+      <path d="M1501 1500A871 871 0 0 1 2340 686" stroke="#4f86e6" stroke-width="1.5" opacity="0.44"/>
+      <path d="M1468 1500A909 909 0 0 1 2339 652" stroke="#2a56ad" stroke-width="1.5" opacity="0.63"/>
+      <path d="M1436 1500A946 946 0 0 1 2339 619" stroke="#2f63c4" stroke-width="1.5" opacity="0.58"/>
+      <path d="M1406 1500A982 982 0 0 1 2339 587" stroke="#3d74d8" stroke-width="2" opacity="0.39"/>
+      <path d="M1367 1499A1025 1025 0 0 1 2340 548" stroke="#4f86e6" stroke-width="1.5" opacity="0.56"/>
+      <path d="M1330 1500A1067 1067 0 0 1 2339 510" stroke="#2a56ad" stroke-width="2.4" opacity="0.31"/>
+      <path d="M1294 1499A1109 1109 0 0 1 2338 473" stroke="#2f63c4" stroke-width="1.5" opacity="0.57"/>
+      <path d="M1253 1499A1155 1155 0 0 1 2339 431" stroke="#3d74d8" stroke-width="1.2" opacity="0.44"/>
+      <path d="M1213 1498A1201 1201 0 0 1 2339 390" stroke="#4f86e6" stroke-width="1.5" opacity="0.5"/>
+      <path d="M1175 1499A1243 1243 0 0 1 2339 351" stroke="#2a56ad" stroke-width="2" opacity="0.41"/>
+      <path d="M1135 1499A1288 1288 0 0 1 2339 310" stroke="#2f63c4" stroke-width="1.2" opacity="0.45"/>
+      <path d="M1091 1500A1338 1338 0 0 1 2339 265" stroke="#3d74d8" stroke-width="1.2" opacity="0.46"/>
+      <path d="M1054 1498A1380 1380 0 0 1 2339 227" stroke="#4f86e6" stroke-width="2.4" opacity="0.55"/>
+      <path d="M1008 1498A1431 1431 0 0 1 2338 181" stroke="#2a56ad" stroke-width="1.5" opacity="0.59"/>
+      <path d="M918 1498A1532 1532 0 0 1 2338 88" stroke="#3d74d8" stroke-width="2" opacity="0.41"/>
+      <path d="M875 1499A1579 1579 0 0 1 2340 45" stroke="#4f86e6" stroke-width="2" opacity="0.51"/>
+      <path d="M835 1499A1625 1625 0 0 1 2339 3" stroke="#2a56ad" stroke-width="1.5" opacity="0.57"/>
+      <path d="M788 1499A1677 1677 0 0 1 2337 -45" stroke="#2f63c4" stroke-width="2" opacity="0.43"/>
+      <path d="M746 1500A1724 1724 0 0 1 2339 -88" stroke="#3d74d8" stroke-width="2.4" opacity="0.45"/>
+      <path d="M701 1500A1774 1774 0 0 1 2337 -133" stroke="#4f86e6" stroke-width="2" opacity="0.33"/>
+      <path d="M651 1500A1829 1829 0 0 1 2338 -184" stroke="#2a56ad" stroke-width="2" opacity="0.39"/>
+      <path d="M599 1499A1887 1887 0 0 1 2339 -237" stroke="#2f63c4" stroke-width="2" opacity="0.54"/>
+      <path d="M546 1499A1945 1945 0 0 1 2339 -291" stroke="#3d74d8" stroke-width="1.5" opacity="0.34"/>
+      <path d="M500 1499A1996 1996 0 0 1 2337 -338" stroke="#4f86e6" stroke-width="1.2" opacity="0.53"/>
+      <path d="M450 1499A2051 2051 0 0 1 2338 -389" stroke="#2a56ad" stroke-width="1.5" opacity="0.5"/>
+      <path d="M402 1499A2105 2105 0 0 1 2178 -420" stroke="#2f63c4" stroke-width="2.4" opacity="0.34"/>
+      <path d="M351 1498A2160 2160 0 0 1 1935 -419" stroke="#3d74d8" stroke-width="1.5" opacity="0.5"/>
+      <path d="M298 1498A2219 2219 0 0 1 1758 -420" stroke="#4f86e6" stroke-width="2.4" opacity="0.48"/>
+      <path d="M244 1497A2278 2278 0 0 1 1610 -419" stroke="#2a56ad" stroke-width="2" opacity="0.56"/>
+      <path d="M186 1496A2340 2340 0 0 1 1476 -419" stroke="#2f63c4" stroke-width="2.4" opacity="0.58"/>
+      <path d="M133 1496A2399 2399 0 0 1 1362 -418" stroke="#3d74d8" stroke-width="1.2" opacity="0.43"/>
+      <path d="M78 1500A2459 2459 0 0 1 1256 -419" stroke="#4f86e6" stroke-width="1.5" opacity="0.43"/>
+      <path d="M27 1499A2515 2515 0 0 1 1161 -419" stroke="#2a56ad" stroke-width="1.5" opacity="0.36"/>
+      <path d="M-26 1499A2573 2573 0 0 1 1068 -418" stroke="#2f63c4" stroke-width="1.2" opacity="0.51"/>
+      <path d="M-78 1499A2631 2631 0 0 1 980 -419" stroke="#3d74d8" stroke-width="1.2" opacity="0.34"/>
+      <path d="M-140 1498A2698 2698 0 0 1 878 -417" stroke="#4f86e6" stroke-width="1.2" opacity="0.51"/>
+      <path d="M-202 1497A2765 2765 0 0 1 785 -420" stroke="#2a56ad" stroke-width="1.5" opacity="0.51"/>
+      <path d="M-262 1496A2830 2830 0 0 1 692 -418" stroke="#2f63c4" stroke-width="2.4" opacity="0.64"/>
+      <path d="M-321 1495A2894 2894 0 0 1 606 -418" stroke="#3d74d8" stroke-width="2" opacity="0.33"/>
+      <path d="M-386 1499A2964 2964 0 0 1 515 -419" stroke="#4f86e6" stroke-width="2" opacity="0.46"/>
+      <path d="M-419 1267A3028 3028 0 0 1 430 -418" stroke="#2a56ad" stroke-width="1.5" opacity="0.33"/>
+      <path d="M-419 948A3097 3097 0 0 1 344 -420" stroke="#2f63c4" stroke-width="1.5" opacity="0.46"/>
+      <path d="M-418 729A3165 3165 0 0 1 259 -419" stroke="#3d74d8" stroke-width="2.4" opacity="0.36"/>
+      <path d="M-420 553A3232 3232 0 0 1 177 -418" stroke="#4f86e6" stroke-width="1.2" opacity="0.54"/>
+      <path class="ribbon-edge" d="M956 1498A1488 1488 0 0 1 2339 127" pathLength="1"/>
+      <path class="ribbon" d="M964 1498A1480 1480 0 0 1 2339 135" pathLength="1"/>
+    </g>
+    <path class="bracket" d="M1796 48H1872V124"/>
+    <path class="bracket" d="M48 956V1032H124"/>
+  </svg>
+</div>
+<script>/* ?brackets=0 hides the corner brackets (Up Next has a bar where the lower one sits) */
+if (/[?&]brackets=0/.test(location.search)) document.querySelectorAll(".bracket").forEach(function (n) { n.style.display = "none"; });</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Intro: wordmark slam</title>
+<!-- Timeline (s): panels wipe in 0.00-0.40, title slams in 0.30-0.50 (hit at 0.45), shake 0.50-0.72,
+     subtitle block wipes in 0.75-1.05, hold, everything clears 2.50-2.95. ?t=<seconds> shows one frame. -->
+<link rel="stylesheet" href="{{base}}intro.css">
+<style>
+.deep { top: 250px; height: 580px; background: var(--blue-deep); }
+.front { top: 320px; height: 440px; background: var(--blue-team); }
+.front svg { position: absolute; left: 0; top: 0; width: 1920px; height: 440px; }
+.ribbon { top: 312px; height: 8px; background: var(--amber); }
+.title { top: 380px; font-size: {{title_size}}px; line-height: 1; }
+.sub { position: absolute; left: 0; top: 600px; width: 1920px; display: flex; justify-content: center; }
+.sub-block { background: var(--amber); color: var(--navy); font-size: {{subtitle_size}}px; line-height: 1;
+  padding: 18px 56px; clip-path: polygon(24px 0, 100% 0, calc(100% - 24px) 100%, 0 100%); }
+</style>
+</head>
+<body>
+<div class="fill" id="wrap">
+  <div class="band deep" id="deep"></div>
+  <div class="band front" id="front"><svg id="arcs" viewBox="0 0 1920 440"></svg></div>
+  <div class="band ribbon" id="ribbon"></div>
+  <div class="abs centered title slant" id="title">{{title}}</div>
+  <div class="sub"><div class="sub-block mono" id="sub">{{subtitle}}</div></div>
+</div>
+<script src="{{base}}../motion.js"></script>
+<script>
+tl.arcs(document.getElementById('arcs'), { cx: 1500, cy: 760, r0: 260, step: 90, n: 9, gold: 3 });
+tl.wipe('#deep', 0.00, 0.40);
+tl.wipe('#front', 0.08, 0.46);
+tl.wipe('#ribbon', 0.16, 0.54);
+var rest = { opacity: 1, transform: 'skewX(-8deg) scale(1) translate(0px, 0px)' };
+function at(dx, dy) { return { opacity: 1, transform: 'skewX(-8deg) scale(1) translate(' + dx + 'px, ' + dy + 'px)' }; }
+tl.track('#title', [
+  { t: 0.30, p: { opacity: 0, transform: 'skewX(-8deg) scale(1.6) translate(0px, 0px)' }, e: 'slam' },
+  { t: 0.48, p: rest, e: 'linear' },
+  { t: 0.54, p: at(-9, 6), e: 'linear' }, { t: 0.60, p: at(8, -5), e: 'linear' },
+  { t: 0.66, p: at(-4, 3), e: 'linear' }, { t: 0.72, p: rest }
+]);
+tl.wipe('#sub', 0.75, 1.05);
+tl.wipe('#wrap', 0.00, 0.01, 2.50, 2.95);
+</script>
+</body>
+</html>

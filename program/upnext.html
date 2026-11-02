@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Program: Up Next</title>
+<!-- Full-screen Up Next (1920x1080): the blue field, the event wordmark in the middle and ONE bar along
+     the bottom (brand, NEXT UP matchup, BACK IN countdown or GAME N, headline and subline, sponsor).
+     Data: state.program, state.blue.wins, state.orange.wins and state.bestOf from the scoreboard server.
+     Test options: ?port=49135 (other server port), ?sb=<events url>, ?still=1 (snap entrances). -->
+<link rel="stylesheet" href="program.css">
+<link rel="stylesheet" href="upnext.css">
+<script src="../config.js"></script>
+<script src="../common.js"></script>
+<script src="program.js"></script>
+</head>
+<body>
+<div class="stage">
+  <iframe class="bg-frame in-fade" src="bg.html?brackets=0" title="" tabindex="-1"></iframe>
+
+  <div class="hero">
+    <div class="wordmark in-fade" style="--d:.2s" id="wordmark"></div>
+    <div class="presented in-fade" style="--d:.5s"><span>PRESENTED BY</span><img id="sponsor" alt="" src=""></div>
+  </div>
+
+  <div class="dock">
+    <div class="bar" id="bar">
+      <div class="blk brand"><div class="mark" id="mark"></div><div class="bname" id="bname"></div></div>
+      <div class="blk next">
+        <div class="cap">NEXT UP</div>
+        <div class="match">
+          <div class="team"><span class="chip b"></span><div class="slot" id="nameB"></div></div>
+          <span class="vs">vs</span>
+          <div class="team"><span class="chip o"></span><div class="slot" id="nameO"></div></div>
+        </div>
+      </div>
+      <div class="gold" id="gold" data-mode="game">
+        <div class="grow"><span class="play"></span><span class="gcap">BACK IN</span></div>
+        <div class="gtime" id="gtime"></div>
+        <div class="slot ggame" id="ggame"></div>
+      </div>
+      <div class="blk copy">
+        <div class="slot hl" id="headline"></div>
+        <div class="slot line" id="subline"></div>
+      </div>
+      <div class="blk sponsor"><img id="sponsorBar" alt="" src=""></div>
+    </div>
+  </div>
+</div>
+<script src="upnext.js"></script>
+</body>
+</html>
