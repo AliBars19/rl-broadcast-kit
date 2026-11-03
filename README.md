@@ -4,7 +4,17 @@ Broadcast-style overlays and small tools for streaming Rocket League with OBS: s
 
 > Unofficial, fan-made project, not affiliated with or endorsed by Psyonix or Epic Games. Rocket League is a trademark of its owner. This kit is made for use with Rocket League and ships no game assets, logos or footage.
 
-<!-- screenshots go here -->
+![Starting Soon screen with a countdown, first matchup and promo card](docs/screenshots/starting.jpg)
+
+| Up Next | Be Right Back |
+|---|---|
+| ![Up Next screen with one bar along the bottom](docs/screenshots/upnext.jpg) | ![Be Right Back screen with an away timer](docs/screenshots/brb.jpg) |
+
+| Facecam (your camera fills the dark box) | In-game scoreboard |
+|---|---|
+| ![Facecam screen with a series card and social handles](docs/screenshots/facecam.jpg) | ![Scoreboard bar for the top of the screen](docs/screenshots/scoreboard.jpg) |
+
+Screenshots show the default placeholder text from `config.js`.
 
 ## Status
 
