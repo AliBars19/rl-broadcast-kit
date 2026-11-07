@@ -9,7 +9,7 @@ This is a hobby project that was built for one streamer's setup and then made ge
 Before sending a change:
 
 1. Run the tests (commands are in the README) and keep them passing.
-2. Keep the Node and Python code dependency-free (standard library only).
+2. Keep the Node and Python code dependency-free (standard library only); the two numpy tools, `make_crowd_stem.py` and `sync_audio.py`, are the only exception and their tests must skip cleanly without numpy.
 3. Keep brand, names and sponsors in `config.js`. Do not hard-code a channel, team, player or sponsor into a page or tool.
 4. Never commit secrets (OBS password, stream keys), personal paths, game assets or footage.
 5. Copy rules: no em or en dashes, no letter-spacing, no glow or spotlight effects (the design tests check this).

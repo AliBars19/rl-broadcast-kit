@@ -1,6 +1,6 @@
 # RL Broadcast Kit
 
-Broadcast-style overlays and small tools for streaming Rocket League with OBS: starting, break and BRB screens, a live scoreboard with a control dock, boost panels, lower thirds, an Up Next bar, a stinger and intro renderer, and a clip finder. Everything is plain HTML, CSS and JavaScript (1920x1080 browser sources) plus a few dependency-free Node and Python helpers. Brand, text and an optional sponsor all come from one file, `config.js`.
+Broadcast-style overlays and small tools for streaming Rocket League with OBS: starting, break and BRB screens, a live scoreboard with a control dock, boost panels, lower thirds, an Up Next bar, a stinger and intro renderer, a clip finder with Shorts and vertical TikTok renderers, and PhoneCam, which uses an Android phone as a low-latency OBS camera that also records a high-quality copy on the phone. Everything is plain HTML, CSS and JavaScript (1920x1080 browser sources) plus a few dependency-free Node and Python helpers (numpy is optional, for the crowd stem builder and the PhoneCam audio sync). Brand, text and an optional sponsor all come from one file, `config.js`.
 
 > Unofficial, fan-made project, not affiliated with or endorsed by Psyonix or Epic Games. Rocket League is a trademark of its owner. This kit is made for use with Rocket League and ships no game assets, logos or footage.
 
@@ -18,7 +18,7 @@ Screenshots show the default placeholder text from `config.js`.
 
 ## Status
 
-Built and run on Fedora Linux with the Flatpak build of OBS. The pages themselves are ordinary HTML and are cross-platform, but only Linux has been tested. The helpers use only the Node and Python standard libraries, but Windows and macOS are untested. See [docs/LINUX.md](docs/LINUX.md) for the Linux notes.
+Built and run on Fedora Linux with the Flatpak build of OBS. The pages themselves are ordinary HTML and are cross-platform, but only Linux has been tested. The helpers use only the Node and Python standard libraries (apart from the optional numpy tools), but Windows and macOS are untested. See [docs/LINUX.md](docs/LINUX.md) for the Linux notes.
 
 ## Requirements
 
@@ -28,6 +28,9 @@ Built and run on Fedora Linux with the Flatpak build of OBS. The pages themselve
 | Scoreboard server, relay, tests | Node.js 18 or newer (22 recommended) |
 | Tools and tests | Python 3.10 or newer |
 | Intro, stinger, Shorts renderers | `ffmpeg` and `ffprobe` on PATH, Google Chrome (`google-chrome` on PATH) |
+| TikTok renderer | `ffmpeg` and `ffprobe` on PATH, a bold TrueType font (Noto Sans Bold by default, or set `TIKTOK_FONT`). No Chrome needed |
+| Crowd stem builder (optional) | numpy, run with plain `python3` (not `-I`) |
+| PhoneCam | An Android 13+ phone, `adb`, `ffmpeg`. The Android SDK and JDK 17 are only needed to build the phone app. See [docs/PHONECAM.md](docs/PHONECAM.md) |
 | GPU encodes | The renderers call `h264_nvenc` (NVIDIA). See `tools/program/README.md` for switching to `libx264` |
 
 Fonts (Chakra Petch, IBM Plex Mono, IBM Plex Sans) are bundled in `fonts/`, so the pages work offline.
@@ -54,7 +57,7 @@ node --test
 
 Then add the pages to OBS (next section). `scoreboard-state.json` is created by the server at runtime and is git-ignored.
 
-To keep the helpers running in the background on Linux, copy the templates in `systemd/` (`*.service.example`) to `~/.config/systemd/user/`, replace `/path/to/rl-broadcast-kit` with the real folder and run `systemctl --user enable --now <name>`.
+To keep the helpers running in the background on Linux, copy the templates in `systemd/` (`*.service.example`, including `phone-cam.service.example`) to `~/.config/systemd/user/`, replace `/path/to/rl-broadcast-kit` with the real folder and run `systemctl --user enable --now <name>`.
 
 ## Adding the pages to OBS
 
@@ -146,7 +149,8 @@ sponsor: { name: "Sponsor Name", logo: "program/assets/sponsor.svg" },
 | `tools/obsws.py` | Tiny OBS WebSocket v5 command-line client (standard library only) |
 | `tools/obs_ad_return.py` | Switches the OBS scene when an ad or intro media source ends |
 | `tools/program/` | Stinger renderer, intro builder and end-title compositor. See `tools/program/README.md` |
-| `tools/clips/` | Highlight finder, goal detector, feed-event detector and the vertical Shorts renderer. See `tools/clips/README.md` |
+| `tools/clips/` | Highlight finder, goal detector, feed-event detector, the vertical Shorts renderer, and the black-card TikTok renderer with its crowd stem builder and synthesised sound effects. Ships no footage and no third-party sounds. See `tools/clips/README.md` |
+| `tools/phonecam/` | PhoneCam: Android app, live relay, OBS-triggered recording daemon, verified offload and the `phone-cam` supervisor. See [docs/PHONECAM.md](docs/PHONECAM.md) |
 
 ### OBS WebSocket password
 
@@ -175,10 +179,15 @@ node --test                                          # scoreboard server
 (cd tools && python3 -I -m unittest discover)        # OBS helpers and brand loader
 (cd tools/program && python3 -I -m unittest discover)
 (cd tools/clips && python3 -I -m unittest discover)
+(cd tools/clips && python3 -m unittest discover)       # also runs the numpy crowd stem tests
+(cd tools/phonecam && python3 -m unittest discover)   # PhoneCam PC side (the sync test needs numpy)
+bash tools/test_phone_cam_app.sh                      # supervisor, fake adb
+bash tools/test_phone_cam.sh                          # scrcpy fallback, fake adb
+(cd tools/phonecam/android && ./gradlew testDebugUnitTest)   # phone app JVM tests, needs the Android SDK
 ```
 
-No test starts OBS, Chrome or ffmpeg.
+The numpy tests skip themselves under `python3 -I`. No test starts OBS, Chrome or a phone; a few small tests run ffmpeg on synthetic audio and video (skipped when ffmpeg is missing).
 
 ## Licence and credits
 
-Code is MIT licensed, see [LICENSE](LICENSE). Bundled fonts are under the SIL Open Font License, see [THIRD-PARTY.md](THIRD-PARTY.md). Not affiliated with or endorsed by Psyonix or Epic Games. See [CONTRIBUTING.md](CONTRIBUTING.md) before opening an issue.
+Code is MIT licensed, see [LICENSE](LICENSE). Bundled fonts are under the SIL Open Font License and the Gradle wrapper is Apache-2.0, see [THIRD-PARTY.md](THIRD-PARTY.md). Not affiliated with or endorsed by Psyonix or Epic Games. See [CONTRIBUTING.md](CONTRIBUTING.md) before opening an issue.
