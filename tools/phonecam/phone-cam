@@ -1,0 +1,509 @@
+#!/bin/bash
+# phone-cam: self-healing, windowless phone camera feed for OBS, with phone-side recording.
+#
+# Default (app) mode: the PhoneCam app on the phone owns the camera. It serves the live H.264 feed on
+# a loopback port (reached with `adb forward`) and records chunked MP4s while the stream runs. A
+# relay (tools/phonecam/live_relay.py) turns the feed into MPEG-TS on udp://127.0.0.1:49400, the same
+# input the OBS media source reads (docs/PHONECAM.md calls it "Phone Camera Feed"), and a daemon (tools/phonecam/daemon.py) starts
+# and stops the recording with OBS (obs-websocket) and offloads finished chunks over USB.
+#
+# Fallback (scrcpy) mode, `--scrcpy` or PHONE_CAM_MODE=scrcpy: the old path. scrcpy records the camera
+# into a fifo, ffmpeg remuxes it to MPEG-TS over the same UDP port. No recording. The camera can only be
+# opened by one client, so the two modes cannot run at once.
+#
+# A supervisor restarts the children whenever they die and waits for the phone (adb state "device")
+# when it is unplugged or locked. The app keeps recording while the cable is out.
+#
+#   phone-cam [--scrcpy]        start the supervisor detached, then return
+#   phone-cam stop              stop the supervisor and its children, and the app (frees the camera)
+#   phone-cam status            running or stopped, supervisor pid, app and relay state, last log lines
+#   phone-cam --foreground      run the supervisor attached (for systemd: phone-cam.service)
+#   phone-cam rec start|stop|status    manual recording on the phone (the OBS trigger is the normal path)
+#   phone-cam offload [--watch]        pull finished chunks to ${PHONECAM_OUT_ROOT:-~/Videos/phonecam}/DATE/cam
+#   phone-cam join [DATE]       join the chunks into one file (no re-encode)
+#   phone-cam sync [DATE]       camera-to-stream audio offset, written to cam/sync.json
+#   phone-cam trash DATE        move that stream's camera recording to the Trash
+#
+# Plug in and unlock the phone, and accept the USB debugging prompt, before the first start.
+# Log: ${XDG_RUNTIME_DIR:-/tmp}/phone-cam.log (trimmed to the last 500 lines at each attempt).
+#
+# Settings (environment variables, all optional):
+#   PHONECAM_OUT_ROOT   where recordings go on the PC (default ~/Videos/phonecam)
+#   PHONECAM_UDP_PORT   UDP port the OBS media source reads (default 49400)
+#   PHONECAM_LIVE_PORT  local port forwarded to the app's live socket (default 49401)
+#   PHONECAM_SERIAL     adb serial of the phone, when more than one device is plugged in
+#   PHONECAM_DIR        folder with live_relay.py and daemon.py (default: next to this script)
+#   PHONECAM_FREE_CAMERA_PKGS  space separated Android packages to force-stop before the camera is
+#                       opened (another camera app that holds it); default none
+#   SCRCPY_DIR          scrcpy fallback only: folder holding the scrcpy binary; default is `scrcpy` on PATH
+
+set -u
+
+SCRCPY_DIR="${SCRCPY_DIR:-}"   # empty: use `scrcpy` from PATH
+RUNTIME="${XDG_RUNTIME_DIR:-/tmp}"
+FIFO="$RUNTIME/phone-cam.fifo"
+LOG="$RUNTIME/phone-cam.log"
+LOCK="$RUNTIME/phone-cam.lock"
+PIDFILE="$RUNTIME/phone-cam.pid"
+MODEFILE="$RUNTIME/phone-cam.mode"
+UDP_PORT="${PHONECAM_UDP_PORT:-49400}"
+UDP_URL="udp://127.0.0.1:$UDP_PORT?pkt_size=1316"
+FREE_CAMERA_PKGS="${PHONECAM_FREE_CAMERA_PKGS:-}"
+SELF=$(readlink -f "${BASH_SOURCE[0]}")
+
+MODE="${PHONE_CAM_MODE:-app}"
+PHONECAM_DIR="${PHONECAM_DIR:-$(dirname "$SELF")}"
+APP_PKG="io.github.rlbroadcastkit.phonecam"
+APP_LIVE_PORT=49401                            # the port the app listens on, on the phone (fixed)
+LIVE_PORT="${PHONECAM_LIVE_PORT:-49401}"       # the port on this PC that adb forwards to it
+RELAY_STATUS="$RUNTIME/phone-cam.relay.json"
+DAEMON_STATUS="$RUNTIME/phone-cam.daemon.json"   # the daemon's warnings (OBS gone, storage full, ...)
+RELAY_FAILS=0
+RELAY_RAN=0         # 1 when the last attempt got as far as running the relay
+RELAY_FAILS_MAX=3   # this many quick relay failures in a row: restart the phone app too
+APP_START_EXTRAS="${PHONE_CAM_APP_EXTRAS:-}"   # extra `am start --es key value` pairs, for experiments
+
+# Every adb call names the device (PHONECAM_SERIAL, else the first one adb lists as ready), so a second
+# phone or tablet on the USB hub cannot be addressed by mistake.
+ADBX=(adb)
+SERIAL=""
+adbx_init() {
+    local serial="${PHONECAM_SERIAL:-}" candidate first=""
+    if [ -z "$serial" ]; then
+        # The ready device that has the PhoneCam app installed; else the first ready one (same rule as adbphone.py).
+        while read -r candidate; do
+            [ -n "$candidate" ] || continue
+            [ -n "$first" ] || first="$candidate"
+            if timeout 10 adb -s "$candidate" shell pm list packages "$APP_PKG" </dev/null 2>/dev/null 9>&- | grep -q "package:$APP_PKG\$"; then
+                serial="$candidate"; break
+            fi
+        done < <(timeout 10 adb devices 2>/dev/null 9>&- | awk 'NR>1 && $2=="device" {print $1}')
+        [ -n "$serial" ] || serial="$first"
+    fi
+    SERIAL="$serial"
+    ADBX=("${ADB:-adb}")
+    if [ -n "$serial" ]; then ADBX+=(-s "$serial"); fi
+}
+
+POLL=3          # seconds between adb checks while the phone is not ready
+BASE_DELAY=2    # seconds before a retry
+MAX_DELAY=10    # backoff ceiling
+FAST_FAIL=15    # a run shorter than this counts as a failure
+STABLE_RUN=60   # a run longer than this resets the delay
+
+STOP=0
+READER=""
+WRITER=""
+DAEMON=""
+ADB=""
+
+log() { printf '%s %s\n' "$(date '+%F %T')" "$*" >>"$LOG"; }
+
+# Sleep that a trapped signal can interrupt.
+nap() {
+    sleep "$1" 9>&- &
+    local sp=$!
+    wait "$sp" 2>/dev/null
+    kill "$sp" 2>/dev/null
+}
+
+# True when a supervisor holds the lock (children never inherit fd 9, so only it can).
+running() { ! flock -n "$LOCK" true 2>/dev/null; }
+
+need() {
+    local missing=0 tool
+    for tool in "$@"; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            echo "phone-cam: $tool not found on PATH." >&2
+            missing=1
+        fi
+    done
+    return "$missing"
+}
+
+preflight() {
+    local bad=0
+    if [ "$MODE" = scrcpy ]; then
+        need adb ffmpeg flock || bad=1
+        if [ -n "$SCRCPY_DIR" ] && [ ! -x "$SCRCPY_DIR/scrcpy" ]; then
+            echo "phone-cam: scrcpy missing: $SCRCPY_DIR/scrcpy (fix SCRCPY_DIR, or unset it to use scrcpy from PATH)." >&2
+            bad=1
+        elif [ -z "$SCRCPY_DIR" ] && ! command -v scrcpy >/dev/null 2>&1; then
+            echo "phone-cam: scrcpy not found on PATH (install it, or set SCRCPY_DIR to the folder holding it)." >&2
+            bad=1
+        fi
+    else
+        need adb python3 flock || bad=1
+        if [ ! -f "$PHONECAM_DIR/live_relay.py" ] || [ ! -f "$PHONECAM_DIR/daemon.py" ]; then
+            echo "phone-cam: tools missing in $PHONECAM_DIR (set PHONECAM_DIR)." >&2
+            bad=1
+        fi
+    fi
+    [ "$bad" = 0 ] || exit 1
+}
+
+# Stop one child by its stored pid: TERM, then KILL after 5 s, then reap it.
+stop_pid() {
+    local pid=$1 wd
+    [ -n "$pid" ] || return 0
+    kill -TERM "$pid" 2>/dev/null
+    ( sleep 5 9>&-; kill -KILL "$pid" 2>/dev/null ) 9>&- &
+    wd=$!
+    while kill -0 "$pid" 2>/dev/null; do wait "$pid" 2>/dev/null; done
+    kill "$wd" 2>/dev/null
+    wait "$wd" 2>/dev/null
+    return 0
+}
+
+stop_children() {
+    stop_pid "$WRITER"; WRITER=""
+    stop_pid "$READER"; READER=""
+    rm -f "$FIFO"
+}
+
+cleanup() {
+    stop_children
+    stop_pid "$DAEMON"; DAEMON=""
+    if [ "$(cat "$PIDFILE" 2>/dev/null)" = "$$" ]; then rm -f "$PIDFILE" "$MODEFILE"; fi
+}
+
+# Keep the last 500 lines. Truncate IN PLACE (same inode): the daemon and relay hold the log open in append
+# mode, and replacing the file with mv would leave them writing into a deleted file.
+trim_log() {
+    if [ -f "$LOG" ] && tail -n 500 "$LOG" >"$LOG.tmp" 2>/dev/null; then
+        cat "$LOG.tmp" >"$LOG"
+        rm -f "$LOG.tmp"
+    fi
+}
+
+# Block until adb reports state "device". Logs once per wait, not once per poll.
+wait_for_phone() {
+    local state logged=0
+    while [ "$STOP" = 0 ]; do
+        ensure_daemon
+        adbx_init
+        state=$(timeout 10 "${ADBX[@]}" get-state 2>/dev/null 9>&-)
+        if [ "$state" = device ]; then
+            if [ "$logged" = 1 ]; then log "phone ready"; fi
+            return 0
+        fi
+        if [ "$logged" = 0 ]; then
+            log "waiting for phone (adb state: ${state:-none}): plug it in and unlock it"
+            logged=1
+        fi
+        nap "$POLL"
+    done
+    return 1
+}
+
+start_feed() {
+    ffmpeg -hide_banner -loglevel warning -fflags nobuffer -probesize 32768 -analyzeduration 0 \
+        -f matroska -i "$FIFO" \
+        -c copy -muxdelay 0 -muxpreload 0 -f mpegts -flush_packets 1 "$UDP_URL" \
+        </dev/null >>"$LOG" 2>&1 9>&- &
+    READER=$!
+    (
+        if [ -n "$SCRCPY_DIR" ]; then cd "$SCRCPY_DIR" || exit 1; SCRCPY=./scrcpy; else SCRCPY=scrcpy; fi
+        ADB="$ADB" exec "$SCRCPY" --video-source=camera --camera-id=0 --camera-size=1920x1080 \
+            ${SERIAL:+--serial="$SERIAL"} --camera-fps=60 --no-audio --no-window --no-playback --video-bit-rate=16M \
+            --record="$FIFO" --record-format=mkv
+    ) </dev/null >>"$LOG" 2>&1 9>&- &
+    WRITER=$!
+}
+
+# Force-stop the packages named in PHONECAM_FREE_CAMERA_PKGS: the camera can only be opened by one client.
+free_camera() {
+    local pkg
+    for pkg in $FREE_CAMERA_PKGS; do
+        timeout 10 "${ADBX[@]}" shell am force-stop "$pkg" >/dev/null 2>&1 9>&- || true
+    done
+}
+
+# One scrcpy feed attempt: returns when either child exits or a stop is requested.
+attempt_scrcpy() {
+    local done_pid="" rc reason
+    rm -f "$FIFO"
+    if ! mkfifo "$FIFO"; then log "cannot create $FIFO"; return 0; fi
+    free_camera
+    start_feed
+    log "feed started (reader $READER, writer $WRITER)"
+    wait -n -p done_pid "$READER" "$WRITER"
+    rc=$?
+    if [ -z "${done_pid:-}" ]; then
+        reason="stop requested"
+    elif [ "$done_pid" = "$READER" ]; then
+        reason="reader (ffmpeg) exited with status $rc"; READER=""
+    else
+        reason="writer (scrcpy) exited with status $rc"; WRITER=""
+    fi
+    stop_children
+    log "feed ended: $reason"
+}
+
+# --- app mode -------------------------------------------------------------------------------
+
+# True when the phone app is running and says so in its status file.
+app_alive() {
+    local pid status
+    pid=$(timeout 10 "${ADBX[@]}" shell pidof "$APP_PKG" 2>/dev/null 9>&-)
+    [ -n "$pid" ] || return 1
+    status=$(timeout 10 "${ADBX[@]}" shell cat "/sdcard/Android/data/$APP_PKG/files/status.json" 2>/dev/null 9>&-)
+    case "$status" in *'"running":true'*) return 0 ;; esac
+    return 1
+}
+
+# Start the app through its trampoline activity (Android only lets a visible app open the camera).
+launch_app() {
+    local i extras=()
+    # shellcheck disable=SC2206
+    [ -z "$APP_START_EXTRAS" ] || extras=($APP_START_EXTRAS)
+    free_camera
+    timeout 20 "${ADBX[@]}" shell am start -n "$APP_PKG/.LaunchActivity" "${extras[@]}" >/dev/null 2>&1 9>&- || true
+    for i in $(seq 1 30); do
+        [ "$STOP" = 0 ] || return 1
+        app_alive && return 0
+        nap 0.5
+    done
+    return 1
+}
+
+start_relay() {
+    python3 -I "$PHONECAM_DIR/live_relay.py" --port "$LIVE_PORT" --udp-port "$UDP_PORT" \
+        --status-file "$RELAY_STATUS" </dev/null >>"$LOG" 2>&1 9>&- &
+    READER=$!
+}
+
+ensure_daemon() {
+    [ "$MODE" != scrcpy ] || return 0
+    if [ -z "$DAEMON" ] || ! kill -0 "$DAEMON" 2>/dev/null; then start_daemon; fi
+}
+
+start_daemon() {
+    python3 -I "$PHONECAM_DIR/daemon.py" </dev/null >>"$LOG" 2>&1 9>&- &
+    DAEMON=$!
+    log "daemon started (pid $DAEMON)"
+}
+
+# One app attempt: returns when the relay exits (phone gone, app gone) or a stop is requested.
+# The daemon outlives attempts and is restarted on its own if it dies.
+attempt_app() {
+    local done_pid="" rc reason
+    RELAY_RAN=0
+    if ! timeout 10 "${ADBX[@]}" forward "tcp:$LIVE_PORT" "tcp:$APP_LIVE_PORT" >/dev/null 2>&1 9>&-; then
+        log "adb forward failed"
+        return 0
+    fi
+    if ! app_alive; then
+        log "starting the phone app"
+        launch_app || { log "the phone app did not come up (is the screen unlocked, camera free?)"; return 0; }
+    fi
+    start_relay
+    RELAY_RAN=1
+    log "feed started (relay $READER, daemon ${DAEMON:-none})"
+    while [ "$STOP" = 0 ]; do
+        [ -n "$DAEMON" ] || start_daemon
+        done_pid=""
+        wait -n -p done_pid "$READER" "$DAEMON"
+        rc=$?
+        if [ -z "${done_pid:-}" ]; then
+            reason="stop requested"; break
+        elif [ "$done_pid" = "$DAEMON" ]; then
+            log "daemon exited with status $rc, restarting"; DAEMON=""; nap 2
+        else
+            reason="relay exited with status $rc"; READER=""; break
+        fi
+    done
+    stop_pid "$READER"; READER=""
+    log "feed ended: ${reason:-stop requested}"
+}
+
+# A relay that keeps failing quickly while the phone is plugged in usually means a stuck camera or app:
+# stop the app so the next attempt starts a fresh one. A manual recording request survives this.
+count_relay_failure() {
+    [ "$MODE" = scrcpy ] && return 0
+    [ "$RELAY_RAN" = 1 ] || return 0      # adb forward or app launch failures say nothing about the relay
+    if [ "$1" -lt "$FAST_FAIL" ]; then RELAY_FAILS=$((RELAY_FAILS + 1)); else RELAY_FAILS=0; fi
+    if [ "$RELAY_FAILS" -ge "$RELAY_FAILS_MAX" ] && app_recording_and_alive; then
+        log "relay failed $RELAY_FAILS times, but the app is recording and its frames advance: leaving the app alone"
+        RELAY_FAILS=0
+    elif [ "$RELAY_FAILS" -ge "$RELAY_FAILS_MAX" ]; then
+        log "relay failed $RELAY_FAILS times in a row: restarting the phone app"
+        stop_app_service
+        RELAY_FAILS=0
+    fi
+}
+
+# True when the app says it is recording and is alive: its frame counter moves, or it reports a live frame rate
+# (frames restart from 0 after a camera restart, and the counter may not have moved yet). Looked at twice before
+# the answer is "no", because stopping the app would end a good recording.
+app_recording_and_alive() {
+    local try json1 json2 f1 f2 c1 c2
+    for try in 1 2; do
+        json1=$(timeout 10 "${ADBX[@]}" shell cat "/sdcard/Android/data/$APP_PKG/files/status.json" </dev/null 2>/dev/null 9>&-)
+        nap 1.5
+        json2=$(timeout 10 "${ADBX[@]}" shell cat "/sdcard/Android/data/$APP_PKG/files/status.json" </dev/null 2>/dev/null 9>&-)
+        case "$json1$json2" in
+            *'"recording":true'*) ;;
+            *) return 1 ;;
+        esac
+        # The status file must itself be fresh: a frozen status.json (app wedged) says recording forever.
+        c1=$(grep -o '"phone_clock_us":[0-9]*' <<<"$json1" | cut -d: -f2)
+        c2=$(grep -o '"phone_clock_us":[0-9]*' <<<"$json2" | cut -d: -f2)
+        if [ -n "$c1" ] && [ -n "$c2" ] && [ "$c2" -gt "$c1" ]; then
+            f1=$(grep -o '"frames":[0-9]*' <<<"$json1" | cut -d: -f2)
+            f2=$(grep -o '"frames":[0-9]*' <<<"$json2" | cut -d: -f2)
+            if [ -n "$f1" ] && [ -n "$f2" ] && [ "$f2" -gt "$f1" ]; then return 0; fi
+            if grep -Eq '"fps":([1-9][0-9]*)' <<<"$json2"; then return 0; fi
+        fi
+        nap 2
+    done
+    return 1
+}
+
+stop_app_service() {
+    timeout 10 "${ADBX[@]}" shell am startservice -n "$APP_PKG/.CamService" -a "$APP_PKG.STOP" >/dev/null 2>&1 9>&- || true
+}
+
+attempt() {
+    if [ "$MODE" = scrcpy ]; then attempt_scrcpy; else attempt_app; fi
+}
+
+supervise() {
+    local delay=$BASE_DELAY t0 ran
+    ADB=$(command -v adb)
+    exec 9>"$LOCK"
+    if ! flock -n 9; then
+        echo "phone-cam is already running."
+        exit 0
+    fi
+    echo "$$" >"$PIDFILE"
+    echo "$MODE" >"$MODEFILE"
+    trap 'STOP=1' TERM INT
+    trap cleanup EXIT
+    log "supervisor started (pid $$, mode $MODE)"
+    while [ "$STOP" = 0 ]; do
+        trim_log
+        wait_for_phone || break
+        t0=$SECONDS
+        attempt
+        [ "$STOP" = 0 ] || break
+        ran=$((SECONDS - t0))
+        count_relay_failure "$ran"
+        if [ "$ran" -gt "$STABLE_RUN" ]; then delay=$BASE_DELAY; fi
+        log "retrying in ${delay}s (ran ${ran}s)"
+        nap "$delay"
+        if [ "$ran" -lt "$FAST_FAIL" ] && [ "$delay" -lt "$MAX_DELAY" ]; then
+            delay=$((delay * 2))
+            if [ "$delay" -gt "$MAX_DELAY" ]; then delay=$MAX_DELAY; fi
+        fi
+    done
+    log "supervisor stopped"
+    exit 0
+}
+
+cmd_start() {
+    local i
+    if running; then
+        echo "phone-cam is already running (pid $(cat "$PIDFILE" 2>/dev/null))."
+        return 0
+    fi
+    nohup setsid "$SELF" --foreground "--$MODE" >/dev/null 2>&1 </dev/null &
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+        sleep 0.2
+        if running && [ -s "$PIDFILE" ]; then
+            echo "phone-cam started (pid $(cat "$PIDFILE")). Log: $LOG"
+            return 0
+        fi
+    done
+    echo "phone-cam did not start; see $LOG" >&2
+    return 1
+}
+
+# After an explicit stop: end any manual recording request and let the app finish its chunk and free the camera.
+# Chunks still on the phone are offloaded the next time phone-cam starts.
+release_phone() {
+    rm -f "${PHONECAM_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/phonecam}/manual-session"
+    ADB=$(command -v adb) && adbx_init && stop_app_service
+}
+
+# Only signal a pid whose command line says phone-cam (a stale pid file may name an unrelated process).
+is_phone_cam_pid() {
+    [[ "${1:-}" =~ ^[0-9]+$ ]] && [ -r "/proc/$1/cmdline" ] && tr '\0' ' ' <"/proc/$1/cmdline" | grep -q 'phone-cam'
+}
+
+cmd_stop() {
+    local pid i
+    if ! running; then
+        echo "phone-cam is not running."
+        [ "$MODE" = scrcpy ] || release_phone
+        return 0
+    fi
+    pid=$(cat "$PIDFILE" 2>/dev/null)
+    if ! is_phone_cam_pid "$pid"; then
+        echo "phone-cam: the pid file names '${pid:-nothing}', which is not a phone-cam process; not signalling it." >&2
+        return 1
+    fi
+    if ! kill -TERM "$pid" 2>/dev/null; then
+        echo "phone-cam: cannot signal the supervisor (pid file: ${pid:-empty})." >&2
+        return 1
+    fi
+    for ((i = 0; i < 100; i++)); do
+        if ! running; then
+            echo "phone-cam stopped."
+            [ "$MODE" = scrcpy ] || release_phone
+            return 0
+        fi
+        sleep 0.2
+    done
+    echo "phone-cam: supervisor $pid did not exit within 20 s." >&2
+    return 1
+}
+
+cmd_status() {
+    if running && [ -s "$MODEFILE" ]; then MODE=$(cat "$MODEFILE"); fi
+    if running; then
+        echo "running (supervisor pid $(cat "$PIDFILE" 2>/dev/null))"
+    else
+        echo "stopped"
+    fi
+    echo "mode: $MODE"
+    if [ "$MODE" != scrcpy ]; then app_status; fi
+    if [ -f "$LOG" ]; then tail -n 10 "$LOG"; fi
+}
+
+# One line about the app (from its status.json) and one about the live latency (from the relay).
+app_status() {
+    local json
+    ADB=$(command -v adb) || return 0
+    adbx_init
+    json=$(timeout 10 "${ADBX[@]}" shell cat "/sdcard/Android/data/$APP_PKG/files/status.json" 2>/dev/null)
+    if [ -n "$json" ]; then echo "app: $json"; else echo "app: no status (phone away or app not running)"; fi
+    if [ -s "$RELAY_STATUS" ]; then echo "relay: $(cat "$RELAY_STATUS")"; fi
+    if [ -s "$DAEMON_STATUS" ] && ! grep -q '"warnings": \[\]' "$DAEMON_STATUS"; then
+        echo "WARNING: $(cat "$DAEMON_STATUS")"
+    fi
+}
+
+need flock || exit 1
+
+# --scrcpy / --app may appear anywhere; the first other word is the command.
+args=()
+for a in "$@"; do
+    case "$a" in
+        --scrcpy) MODE=scrcpy ;;
+        --app)    MODE=app ;;
+        *)        args+=("$a") ;;
+    esac
+done
+set -- "${args[@]+"${args[@]}"}"
+
+tool() { exec python3 "$PHONECAM_DIR/phonecam.py" "$@"; }
+
+case "${1:-start}" in
+    start)        preflight; cmd_start ;;
+    stop)         cmd_stop ;;
+    status)       cmd_status ;;
+    --foreground) preflight; supervise ;;
+    rec|offload|join|sync|trash) tool "$@" ;;
+    *) echo "usage: phone-cam [--scrcpy] [stop|status|--foreground|rec start|stop|status|offload|join|sync|trash]" >&2; exit 2 ;;
+esac
