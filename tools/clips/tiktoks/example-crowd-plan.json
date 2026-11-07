@@ -1,0 +1,14 @@
+{
+  "spec": "tools/clips/tiktoks/example.json",
+  "output": "/path/to/tiktoks/defense-crowd.wav",
+  "sounds_dir": "/path/to/sounds/",
+  "seed": 7,
+  "bed": {"name": "crowd_bed", "level_db": -34, "follow_db": 6},
+  "room": {"wet": 0.25, "rt60": 1.4, "highpass_hz": 150, "lowpass_hz": 6500},
+  "moments": [
+    {"clip": "hook", "at": 3.5, "sound": "crowd_roar", "level_db": -24,
+     "rise": 1.2, "tail": 3.0, "bed_swell_db": 8},
+    {"clip": 0, "at": 6.2, "sound": "crowd_roar", "level_db": -24,
+     "rise": 1.2, "tail": 3.0, "bed_swell_db": 8}
+  ]
+}
