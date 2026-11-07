@@ -1,0 +1,21 @@
+{
+  "caption": "Defense.",
+  "output": "/path/to/tiktoks/defense.mp4",
+  "layout": "kit",
+  "card_seconds": 0.75,
+  "opening_card": true,
+  "clip_comp": true,
+  "crowd_stem": {"path": "/path/to/tiktoks/defense-crowd.wav", "gain_db": 0},
+  "hook": {
+    "source": "/path/to/broadcast.mp4", "start": "00:10:00.0", "end": "00:10:05.0",
+    "layout": "broadcast", "zoom": 1.25
+  },
+  "clips": [
+    {"source": "/path/to/stream.mp4", "start": "01:27:11.0", "end": "01:27:20.0",
+     "sfx": [{"at": -0.4, "name": "whoosh", "gain_db": -6},
+             {"at": 6.2, "name": "impact", "gain_db": 0}],
+     "cam": [{"start": 6.5, "end": 8.5, "mode": "inset"}]},
+    {"source": "/path/to/stream.mp4", "start": "00:35:08.0", "end": "00:35:17.0",
+     "layout": "kit-reaction"}
+  ]
+}
