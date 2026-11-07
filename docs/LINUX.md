@@ -52,7 +52,7 @@ User services only start while your user session is running; add `loginctl enabl
 
 ## Phone as a webcam
 
-A phone over USB with a DroidCam-style app worked: forward the port with `adb forward tcp:4747 tcp:4747` after every replug or reboot, then point the OBS DroidCam source at `127.0.0.1` port 4747. Wireless works too but adds latency.
+The kit's own solution is PhoneCam: an Android app plus a few scripts that send the phone camera to OBS over USB and record a full-quality copy on the phone while you stream. See [PHONECAM.md](PHONECAM.md). A DroidCam-style app also works as a plain webcam: forward its port with `adb forward tcp:4747 tcp:4747` after every replug or reboot, then point the OBS DroidCam source at `127.0.0.1` port 4747. Wireless works too but adds latency. The camera can only be opened by one app at a time, so stop the other one first.
 
 ## Rendering tools
 
