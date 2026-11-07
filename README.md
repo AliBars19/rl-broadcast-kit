@@ -28,7 +28,7 @@ Built and run on Fedora Linux with the Flatpak build of OBS. The pages themselve
 | Scoreboard server, relay, tests | Node.js 18 or newer (22 recommended) |
 | Tools and tests | Python 3.10 or newer |
 | Intro, stinger, Shorts renderers | `ffmpeg` and `ffprobe` on PATH, Google Chrome (`google-chrome` on PATH) |
-| TikTok renderer | `ffmpeg` and `ffprobe` on PATH, a bold TrueType font (Noto Sans Bold by default, or set `TIKTOK_FONT`). No Chrome needed |
+| TikTok renderer | `ffmpeg` and `ffprobe` on PATH, a bold TrueType font (Noto Sans Bold by default, or set `TIKTOK_FONT`), and an NVIDIA GPU for `h264_nvenc` (see the GPU encodes row). No Chrome needed |
 | Crowd stem builder (optional) | numpy, run with plain `python3` (not `-I`) |
 | PhoneCam | An Android 13+ phone, `adb`, `ffmpeg`. The Android SDK and JDK 17 are only needed to build the phone app. See [docs/PHONECAM.md](docs/PHONECAM.md) |
 | GPU encodes | The renderers call `h264_nvenc` (NVIDIA). See `tools/program/README.md` for switching to `libx264` |
