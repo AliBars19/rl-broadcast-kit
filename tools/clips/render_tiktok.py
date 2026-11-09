@@ -498,8 +498,15 @@ def _cam_window(raw, where, length, layout, kind=None, top_y=TOP_Y_DEFAULT):
     return {"start": start, "end": end, "mode": mode, "x": x}
 
 
+def _touches_below(window, previous):
+    """True when a below window starts where the previous below window ends: one cam block."""
+    return (window["mode"] == BELOW and previous["mode"] == BELOW
+            and abs(window["start"] - previous["end"]) < SOUND_END_TOLERANCE)
+
+
 def _cam_windows(raw, where, length, layout, kind=None, top_y=TOP_Y_DEFAULT):
-    """The cam list of a clip: windows in order, none overlapping (touching is fine)."""
+    """The cam list of a clip: windows in order, none overlapping. Touching below windows are one
+    window (one cam block, one fade in); touching windows of other modes are kept apart."""
     if not isinstance(raw, list):
         raise SpecError(f"{where}: cam must be a list")
     windows = []
@@ -509,6 +516,13 @@ def _cam_windows(raw, where, length, layout, kind=None, top_y=TOP_Y_DEFAULT):
             raise SpecError(f"{where} cam window {n}: windows must be in order")
         if windows and window["start"] < windows[-1]["end"]:
             raise SpecError(f"{where} cam window {n}: overlaps the window before it")
+        if windows and _touches_below(window, windows[-1]):
+            if window["x"] != windows[-1]["x"]:
+                raise SpecError(f"{where} cam window {n}: touches the window before it, so the "
+                                "two are one cam block and must share x (got "
+                                f"{windows[-1]['x']} and {window['x']})")
+            windows[-1] = {**windows[-1], "end": window["end"]}
+            continue
         windows.append(window)
     return windows
 

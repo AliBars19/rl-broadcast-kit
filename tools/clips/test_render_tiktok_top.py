@@ -181,6 +181,26 @@ class TopValidationTests(SfxDirCase):
             with self.subTest(value=value):
                 self.assertInvalid(raw, "not for a broadcast source")
 
+    def test_touching_below_windows_merge_into_one(self):
+        raw = top_spec()
+        raw["clips"][1]["cam"] = [{"start": 1, "end": 2, "mode": "below"},
+                                  {"start": 2, "end": 3.5, "mode": "below"}]
+        cam = self.validate(raw)["clips"][1]["cam"]
+        self.assertEqual([(w["mode"], w["start"], w["end"]) for w in cam],
+                         [("below", 1, 3.5)])
+
+    def test_touching_below_windows_must_share_x_to_merge(self):
+        raw = top_spec()
+        raw["clips"][1]["cam"] = [{"start": 1, "end": 2, "mode": "below", "x": 40},
+                                  {"start": 2, "end": 3.5, "mode": "below", "x": 44}]
+        self.assertInvalid(raw, "share x")
+
+    def test_a_gap_between_below_windows_keeps_them_apart(self):
+        raw = top_spec()
+        raw["clips"][1]["cam"] = [{"start": 1, "end": 2, "mode": "below"},
+                                  {"start": 2.1, "end": 3.5, "mode": "below"}]
+        self.assertEqual(len(self.validate(raw)["clips"][1]["cam"]), 2)
+
     def test_below_is_only_for_layout_top(self):
         raw = {"caption": "A.", "output": "/o/a.mp4", "layout": "kit",
                "clips": [{"source": "/v/s.mp4", "start": 0, "end": 5,
@@ -479,6 +499,12 @@ class TopCommandTests(SfxDirCase):
                                          cover=False))
         self.assertIn("overlay=0:948:format=auto:enable='gte(t,12.2417)*lt(t,16.7417)'", video)
 
+    def test_touching_below_windows_are_one_fade_and_one_overlay(self):
+        video = self.video(self.kit_clip([{"start": 1, "end": 2, "mode": "below"},
+                                          {"start": 2, "end": 3, "mode": "below"}]))
+        self.assertEqual(video.count("fade=t=in"), 1)
+        self.assertEqual(video.count("overlay=0:948:format=auto:enable="), 1)
+
     def test_the_audio_chain_is_the_one_other_layouts_get(self):
         graph = self.graph(self.broadcast_clip())
         self.assertIn("[0:a]aresample=48000,aformat=channel_layouts=stereo,afade=t=in:d=0.05",
@@ -702,6 +728,16 @@ class TopRenderTests(unittest.TestCase):
             with self.subTest(t=t):
                 self.assertTrue(is_lime(frame.at(gx, gy)), frame.at(gx, gy))
                 self.assertTrue(is_red(frame.at(540, 300 + 4)))
+
+    def test_touching_below_windows_do_not_fade_out_at_the_join(self):
+        spec = raw_spec(self.kit, "kit", cam=False)
+        spec["clips"][0]["cam"] = [{"start": 0.4, "end": 1.3, "mode": "below"},
+                                   {"start": 1.3, "end": 2.2, "mode": "below"}]
+        out, _ = render_scene(self.tmp, spec, "touch.mov")
+        x, y, w, h = rt.below_block(300)
+        for t in (1.0, 1.36, 1.8):
+            with self.subTest(t=t):
+                self.assertTrue(is_lime(Frame(out, t).at(540, y + h // 2)))
 
     def test_full_render_opens_on_the_card_and_keeps_the_card_caption_where_it_was(self):
         raw = {"caption": "Hi", "output": os.path.join(self.tmp, "out", "full.mp4"),
