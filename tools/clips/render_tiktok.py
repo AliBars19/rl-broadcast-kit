@@ -134,7 +134,7 @@ BROADCAST = "broadcast"
 SPEC_LAYOUTS = LAYOUTS + (BROADCAST,)       # what a spec may name; LAYOUTS are the stacked ones
 BROADCAST_ZOOM_RANGE = (1.0, 1.6)
 BROADCAST_DEFAULT_ZOOM = 1.25
-BROADCAST_MIN_SOURCE = (1920, 1080)         # a smaller source would be upscaled
+BROADCAST_MIN_SOURCE = (1280, 720)          # 1914x1080 and 1280x720 broadcasts both occur
 BROADCAST_ASPECT_TOLERANCE = 0.01           # of width / height against 16:9
 BROADCAST_SIZE = (WIDTH, 608)               # 1080 * 9 / 16 = 607.5, rounded up to an even number
 BROADCAST_AT = (0, round((CAM_GAME_Y + KIT_GAME_SIZE[1] / 2 - BROADCAST_SIZE[1] / 2) / 2) * 2)
@@ -792,17 +792,25 @@ def _check_stem(spec, durations):
                         f"at {total:.2f} s: rebuild the stem with make_crowd_stem.py")
 
 
+def broadcast_source_ok(width, height):
+    """Whether a broadcast clip can use a source of this size: at least BROADCAST_MIN_SOURCE and
+    16:9 within BROADCAST_ASPECT_TOLERANCE. The height test runs first, so the division never
+    sees a zero height."""
+    min_w, min_h = BROADCAST_MIN_SOURCE
+    return (width >= min_w and height >= min_h
+            and abs(width / height - 16 / 9) <= 16 / 9 * BROADCAST_ASPECT_TOLERANCE)
+
+
 def _check_source_size(path, size, layout):
     """Stream clips are cropped at fixed pixels, so they need exactly 1920x1080; a broadcast
-    clip takes any 16:9 video from 1920x1080 up (1440p, 4K)."""
+    clip takes any 16:9 video from 1280x720 up (1914x1080 broadcasts, 1440p, 4K)."""
     width, height = size
     if layout != BROADCAST:
         if size != (SRC_W, SRC_H):
             raise SpecError(f"{path} is {width}x{height}, the crops need {SRC_W}x{SRC_H}")
         return
-    min_w, min_h = BROADCAST_MIN_SOURCE
-    if (width < min_w or height < min_h
-            or abs(width / height - 16 / 9) > 16 / 9 * BROADCAST_ASPECT_TOLERANCE):
+    if not broadcast_source_ok(width, height):
+        min_w, min_h = BROADCAST_MIN_SOURCE
         raise SpecError(f"{path} is {width}x{height}, a {BROADCAST} clip needs a 16:9 video "
                         f"of at least {min_w}x{min_h}")
 

@@ -344,16 +344,27 @@ class BroadcastSourceCheckTests(SfxDirCase):
         raw["clips"][1]["layout"] = "broadcast"
         return raw
 
-    def test_16_by_9_sources_of_1080p_and_larger_are_accepted(self):
-        for size in ((1920, 1080), (2560, 1440), (3840, 2160)):
+    def test_16_by_9_sources_from_720p_up_are_accepted(self):
+        for size in ((1280, 720), (1914, 1080), (1918, 1080), (1920, 1080), (1920, 1090),
+                     (2560, 1440), (3840, 2160)):
             self.check(self.raw(), *size)
 
     def test_smaller_or_other_aspect_sources_are_refused(self):
-        for size in ((1280, 720), (1920, 800), (3440, 1440), (1080, 1920), (1920, 1168)):
+        for size in ((960, 540), (1024, 576), (640, 360), (1440, 1080), (1920, 800),
+                     (3440, 1440), (1080, 1920), (1920, 1168), (1920, 1100)):
             with self.assertRaises(rt.SpecError) as ctx:
                 self.check(self.raw(), *size)
-            self.assertIn("broadcast clip needs a 16:9 video of at least 1920x1080",
+            self.assertIn("broadcast clip needs a 16:9 video of at least 1280x720",
                           str(ctx.exception))
+
+    def test_other_layouts_keep_the_exact_1920_by_1080_rule(self):
+        for layout in rt.LAYOUTS:
+            raw = broadcast_spec(layout=layout, clip_layout=False)
+            for size in ((1914, 1080), (1280, 720), (2560, 1440)):
+                with self.assertRaises(rt.SpecError, msg=(layout, size)) as ctx:
+                    self.check(raw, *size)
+                self.assertIn("the crops need 1920x1080", str(ctx.exception))
+            self.check(raw, 1920, 1080)
 
     def test_stream_clips_still_need_exactly_1920_by_1080(self):
         raw = broadcast_spec()                  # clip 2 is a bottom-cam clip of /v/s.mp4
@@ -433,6 +444,12 @@ class BroadcastFrameGridTests(unittest.TestCase):
 
     def test_50_fps_1440p(self):
         self.assertEqual(self.frames_of("2560x1440", 50, 0.31), (90, (1080, 1920)))
+
+    def test_30_fps_1914_wide_broadcast_is_1080_by_1920(self):
+        self.assertEqual(self.frames_of("1914x1080", 30, 0.4), (90, (1080, 1920)))
+
+    def test_30_fps_720p_broadcast_is_upscaled_to_1080_by_1920(self):
+        self.assertEqual(self.frames_of("1280x720", 30, 0.4), (90, (1080, 1920)))
 
     def test_59_94_fps_4k_starting_at_zero(self):
         self.assertEqual(self.frames_of("3840x2160", 59.94, 0), (90, (1080, 1920)))
