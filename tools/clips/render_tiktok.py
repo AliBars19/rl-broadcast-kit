@@ -155,6 +155,8 @@ BROADCAST_BG_SATURATION = 0.8
 #   "bottom-cam" a 1920x1080 recording with the bottom-cam geometry: the frame without the
 #                spectator bar (the 16:9 region of the game block's height), facecam covered the
 #                same way.
+# A kit or bottom-cam clip may set "cover": false to leave its facecam box visible in the game
+# picture (no patch at all; default true). Only layout top with those sources accepts it.
 # `zoom` (1.0 to 1.6, default 1.0) crops the picture anchored at the TOP centre, so the scoreline is
 # kept. Cam windows of mode "below" show the stream's facecam in a block under the game, from the
 # window's start to its end, with a short fade in; the game keeps playing above it.
@@ -220,7 +222,7 @@ DASHES = ("\u2014", "\u2013")
 
 TOP_KEYS = {"caption", "output", "card_seconds", "opening_card", "music", "clips", "layout",
             "sfx_dir", "card_sound", "crowd_bed", "crowd_stem", "clip_comp", "hook", "top_y"}
-CLIP_KEYS = {"source", "start", "end", "sfx", "cam", "layout", "zoom", "source_kind"}
+CLIP_KEYS = {"source", "start", "end", "sfx", "cam", "layout", "zoom", "source_kind", "cover"}
 CAM_KEYS = {"start", "end", "mode", "x"}
 SFX_KEYS = {"at", "name", "gain_db", "start", "duration", "fade_in", "fade_out",
             "stop_at_clip_end"}
@@ -559,6 +561,22 @@ def _zoom(raw, layout, where):
                    *BROADCAST_ZOOM_RANGE)
 
 
+def _cover(raw, layout, kind, where):
+    """Whether the facecam box of a top clip is covered by the mirrored pitch patch (default
+    True). Only layout top with a stream source has a facecam to cover."""
+    if "cover" not in raw:
+        return True
+    value = raw["cover"]
+    if not isinstance(value, bool):
+        raise SpecError(f"{where}: cover must be true or false (got {value!r})")
+    if layout != TOP:
+        raise SpecError(f"{where}: cover is only for layout {TOP} (got {layout})")
+    if kind == DEFAULT_SOURCE_KIND:
+        raise SpecError(f"{where}: cover is not for a {DEFAULT_SOURCE_KIND} source "
+                        "(it has no facecam to cover)")
+    return value
+
+
 def _check_cam_allowed(raw, layout, where, kind=None):
     if "cam" not in raw:
         return
@@ -600,6 +618,7 @@ def _clip(raw, index, sfx_dir, default_layout=DEFAULT_LAYOUT, where=None,
     own = _layout(raw["layout"], f"{where}: layout") if "layout" in raw else None
     layout = own or default_layout
     kind = _source_kind(raw, layout, where)
+    cover = _cover(raw, layout, kind, where)
     _check_cam_allowed(raw, layout, where, kind)
     zoom = _zoom(raw, layout, where)
     cam = (_cam_windows(raw.get("cam", []), where, length, layout, kind, top_y)
@@ -608,6 +627,8 @@ def _clip(raw, index, sfx_dir, default_layout=DEFAULT_LAYOUT, where=None,
             "sfx": sfx, "cam": cam, "layout": own}
     if kind is not None:
         clip["source_kind"] = kind
+    if not cover:
+        clip["cover"] = False
     return {**clip, "zoom": zoom} if zoom is not None else clip
 
 
@@ -1131,16 +1152,19 @@ def _broadcast_graph(zoom):
             f"[bg][fg]overlay={BROADCAST_AT[0]}:{BROADCAST_AT[1]}")
 
 
-def _top_base(source):
+def _top_base(source, patched=True):
     """Chains from the split source [b] (and the donor [p]) to the game picture, split into the
     picture [m] and the background source [k]: the facecam box covered by a blurred mirror of the
-    pitch beside it, then the game region of the overlay. A broadcast has neither."""
+    pitch beside it (only when `patched`), then the game region of the overlay. A broadcast has
+    neither."""
     if source is None:
         return "[b]split=2[m][k];"
+    crop = "crop={}:{}:{}:{},".format(*source.base_crop) if source.base_crop else ""
+    if not patched:
+        return f"[b]{crop}split=2[m][k];"
     cw, ch, cx, cy = source.cover
-    base = ("," + "crop={}:{}:{}:{}".format(*source.base_crop)) if source.base_crop else ""
     return (f"[p]crop={cw}:{ch}:{source.donor_x}:{cy},hflip,boxblur={TOP_COVER_BLUR}[patch];"
-            f"[b][patch]overlay={cx}:{cy}{base},split=2[m][k];")
+            f"[b][patch]overlay={cx}:{cy},{crop}split=2[m][k];")
 
 
 def _below_chain(k, window, kind, block_h):
@@ -1151,24 +1175,26 @@ def _below_chain(k, window, kind, block_h):
             f"fade=t=in:st={frame_snap(window['start']):.4f}:d={BELOW_FADE_IN:g}:alpha=1[cam{k}];")
 
 
-def _top_graph(kind, zoom, top_y, cam):
+def _top_graph(kind, zoom, top_y, cam, cover=True):
     """The game picture at full width with its top edge at top_y over the blurred cover of
     itself, and the facecam block under it during the cam windows (never replacing the game).
 
     The picture is cropped by `zoom` anchored at the top centre (the scoreline stays). Every cam
     crop is cut from its own copy of the source [wk], taken before the facecam box is covered.
+    With `cover` false the facecam box is left as it is in the game picture.
     """
     if cam and kind == DEFAULT_SOURCE_KIND:
         raise ToolError(f"cam windows are not allowed on a {DEFAULT_SOURCE_KIND} source")
     source = TOP_SOURCES.get(kind)
-    outs = "[b]" + ("[p]" if source else "") + "".join(f"[w{k}]" for k in range(len(cam)))
+    patched = source is not None and cover
+    outs = "[b]" + ("[p]" if patched else "") + "".join(f"[w{k}]" for k in range(len(cam)))
     count = outs.count("[")
     head = f"[0:v]fps={FPS}:start_time=0" + (f",split={count}{outs};" if count > 1 else "[b];")
     fw, fh = TOP_GAME_SIZE
     z = f"{zoom:g}"
     picture = (f"[m]crop=trunc(iw/{z}/2)*2:trunc(ih/{z}/2)*2:trunc((iw-ow)/4)*2:0,"
                f"scale={fw}:{fh}:flags=lanczos[fg];")
-    graph = head + _top_base(source) + _cover_background() + picture
+    graph = head + _top_base(source, patched) + _cover_background() + picture
     if not cam:
         return graph + f"[bg][fg]overlay=0:{top_y}"
     _, block_y, _, block_h = below_block(top_y)
@@ -1184,7 +1210,7 @@ def _top_graph(kind, zoom, top_y, cam):
 
 
 def _picture_graph(layout, cam=(), zoom=BROADCAST_DEFAULT_ZOOM, top_y=TOP_Y_DEFAULT,
-                   source_kind=DEFAULT_SOURCE_KIND):
+                   source_kind=DEFAULT_SOURCE_KIND, cover=True):
     """Filter chains up to and including the stack and pad (the caption is added after).
 
     The kit blocks have odd heights (99, 1087), so stacked as yuv420p the chroma of one block
@@ -1197,7 +1223,7 @@ def _picture_graph(layout, cam=(), zoom=BROADCAST_DEFAULT_ZOOM, top_y=TOP_Y_DEFA
             raise ToolError(f"cam windows are not allowed on a {BROADCAST} clip")
         return _broadcast_graph(zoom)
     if layout == TOP:
-        return _top_graph(source_kind, zoom, top_y, cam)
+        return _top_graph(source_kind, zoom, top_y, cam, cover)
     pad = f"pad={WIDTH}:{HEIGHT}:0:{PAD_Y[layout]}:black"
     if cam and layout not in CAM_LAYOUTS:
         raise ToolError(f"cam windows need layout {' or '.join(CAM_LAYOUTS)} (got {layout})")
@@ -1213,11 +1239,11 @@ def _picture_graph(layout, cam=(), zoom=BROADCAST_DEFAULT_ZOOM, top_y=TOP_Y_DEFA
 
 
 def _picture_chain(caption_file, layout=DEFAULT_LAYOUT, cam=(), zoom=BROADCAST_DEFAULT_ZOOM,
-                   top_y=TOP_Y_DEFAULT, source_kind=DEFAULT_SOURCE_KIND):
+                   top_y=TOP_Y_DEFAULT, source_kind=DEFAULT_SOURCE_KIND, cover=True):
     hidden = [w for w in cam if w["mode"] == "full"]
     # Layout top draws the caption above the game block: its baseline TOP_CAPTION_GAP above top_y.
     caption_y = f"{top_y - TOP_CAPTION_GAP}-ascent" if layout == TOP else CAPTION_Y
-    return (f"{_picture_graph(layout, cam, zoom, top_y, source_kind)},{SQUARE_PIXELS},"
+    return (f"{_picture_graph(layout, cam, zoom, top_y, source_kind, cover)},{SQUARE_PIXELS},"
             f"{_drawtext(caption_file, hidden, caption_y)},format=yuv420p[v]")
 
 
@@ -1235,7 +1261,8 @@ def clip_command(clip, caption_file, out_path, layout=DEFAULT_LAYOUT, clip_comp=
                       "-t", f"{length:.3f}",
                       "-filter_complex",
                       _picture_chain(caption_file, layout, clip.get("cam", ()), zoom, top_y,
-                                     clip.get("source_kind", DEFAULT_SOURCE_KIND))
+                                     clip.get("source_kind", DEFAULT_SOURCE_KIND),
+                                     clip.get("cover", True))
                       + ";" + audio,
                       "-map", "[v]", "-map", "[a]"]
             + ENCODE + PCM + ["-threads", THREADS, out_path])

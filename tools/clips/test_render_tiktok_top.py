@@ -150,6 +150,37 @@ class TopValidationTests(SfxDirCase):
                 self.assertEqual([(w["mode"], w["start"], w["end"]) for w in cam],
                                  [("below", 12.25, 16.75)])
 
+    def test_cover_defaults_to_true_and_is_only_kept_when_false(self):
+        self.assertNotIn("cover", self.validate(top_spec())["clips"][1])
+        raw = top_spec()
+        raw["clips"][1]["cover"] = True
+        self.assertNotIn("cover", self.validate(raw)["clips"][1])
+        raw["clips"][1]["cover"] = False
+        self.assertIs(self.validate(raw)["clips"][1]["cover"], False)
+
+    def test_cover_must_be_a_boolean(self):
+        for bad in (0, 1, "false", "no", None, 0.0):
+            raw = top_spec()
+            raw["clips"][1]["cover"] = bad
+            with self.subTest(bad=bad):
+                self.assertInvalid(raw, "cover must be true or false")
+
+    def test_cover_is_only_for_layout_top(self):
+        raw = {"caption": "A.", "output": "/o/a.mp4", "layout": "kit",
+               "clips": [{"source": "/v/s.mp4", "start": 0, "end": 5, "cover": False}]}
+        self.assertInvalid(raw, "cover is only for layout top")
+        raw = top_spec()
+        raw["clips"][1] = {"source": "/v/s.mp4", "start": 0, "end": 5, "layout": "kit",
+                           "cover": True}
+        self.assertInvalid(raw, "cover is only for layout top")
+
+    def test_cover_is_refused_on_a_broadcast_source(self):
+        for value in (True, False):
+            raw = top_spec()
+            raw["clips"][0]["cover"] = value
+            with self.subTest(value=value):
+                self.assertInvalid(raw, "not for a broadcast source")
+
     def test_below_is_only_for_layout_top(self):
         raw = {"caption": "A.", "output": "/o/a.mp4", "layout": "kit",
                "clips": [{"source": "/v/s.mp4", "start": 0, "end": 5,
@@ -426,6 +457,28 @@ class TopCommandTests(SfxDirCase):
         self.assertNotIn("[w0]", video)
         self.assertNotIn("fade=", video)
 
+    def test_cover_defaults_to_true_so_the_patch_is_in_the_graph(self):
+        for kind in ("kit", "bottom-cam"):
+            with self.subTest(kind=kind):
+                video = self.video(self.kit_clip(source_kind=kind))
+                self.assertIn("hflip,boxblur", video)
+                self.assertEqual(video, self.video(self.kit_clip(source_kind=kind, cover=True)))
+
+    def test_cover_false_removes_the_patch_and_keeps_the_game_region(self):
+        video = self.video(self.kit_clip(cover=False))
+        self.assertNotIn("hflip", video)
+        self.assertNotIn("boxblur", video)
+        self.assertNotIn("[patch]", video)
+        self.assertIn(f"[0:v]fps={rt.FPS}:start_time=0[b];[b]split=2[m][k];", video)
+        bottom_cam = self.video(self.kit_clip(source_kind="bottom-cam", cover=False))
+        self.assertNotIn("hflip", bottom_cam)
+        self.assertIn("crop=1714:964:102:0", bottom_cam)
+
+    def test_cover_false_keeps_the_cam_windows(self):
+        video = self.video(self.kit_clip([{"start": 12.25, "end": 16.75, "mode": "below"}],
+                                         cover=False))
+        self.assertIn("overlay=0:948:format=auto:enable='gte(t,12.2417)*lt(t,16.7417)'", video)
+
     def test_the_audio_chain_is_the_one_other_layouts_get(self):
         graph = self.graph(self.broadcast_clip())
         self.assertIn("[0:a]aresample=48000,aformat=channel_layouts=stereo,afade=t=in:d=0.05",
@@ -640,6 +693,15 @@ class TopRenderTests(unittest.TestCase):
         gx, gy = round((200 - 102) * 1080 / 1714), 300 + round(900 * 608 / 964)
         self.assertFalse(is_lime(inside.at(gx, gy)), inside.at(gx, gy))
         self.assertTrue(is_red(inside.at(540, 300 + 4)))
+
+    def test_cover_false_shows_the_facecam_corner_inside_the_game_block(self):
+        out, _ = render_scene(self.tmp, raw_spec(self.kit, "kit", cover=False), "nocover.mov")
+        gx, gy = round(300 * 1080 / 1920), 300 + round(870 * 608 / 1080)
+        for t in (SAMPLE_BEFORE, SAMPLE_INSIDE):
+            frame = Frame(out, t)
+            with self.subTest(t=t):
+                self.assertTrue(is_lime(frame.at(gx, gy)), frame.at(gx, gy))
+                self.assertTrue(is_red(frame.at(540, 300 + 4)))
 
     def test_full_render_opens_on_the_card_and_keeps_the_card_caption_where_it_was(self):
         raw = {"caption": "Hi", "output": os.path.join(self.tmp, "out", "full.mp4"),
