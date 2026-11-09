@@ -151,6 +151,7 @@ sponsor: { name: "Sponsor Name", logo: "program/assets/sponsor.svg" },
 | `tools/program/` | Stinger renderer, intro builder and end-title compositor. See `tools/program/README.md` |
 | `tools/clips/` | Highlight finder, goal detector, feed-event detector, the vertical Shorts renderer, and the black-card TikTok renderer with its crowd stem builder and synthesised sound effects. Ships no footage and no third-party sounds. See `tools/clips/README.md` |
 | `tools/phonecam/` | PhoneCam: Android app, live relay, OBS-triggered recording daemon, verified offload and the `phone-cam` supervisor. See [docs/PHONECAM.md](docs/PHONECAM.md) |
+| `tools/research/` | TikTok posting research: fetch public video metadata for a list of accounts, summarise posting cadence and views, count scene cuts. Standard library only. See `tools/research/README.md` |
 
 ### OBS WebSocket password
 
