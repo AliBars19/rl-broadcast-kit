@@ -131,7 +131,8 @@ CAM_INSET_AT = CAM_GEOMETRY["kit"].inset_at
 # is the same clip, scaled to cover, blurred and darkened. The background is built at a sixteenth
 # of the pixels and scaled up after the blur, which makes the blur cheap.
 BROADCAST = "broadcast"
-SPEC_LAYOUTS = LAYOUTS + (BROADCAST,)       # what a spec may name; LAYOUTS are the stacked ones
+TOP = "top"
+SPEC_LAYOUTS = LAYOUTS + (BROADCAST, TOP)   # what a spec may name; LAYOUTS are the stacked ones
 BROADCAST_ZOOM_RANGE = (1.0, 1.6)
 BROADCAST_DEFAULT_ZOOM = 1.25
 BROADCAST_MIN_SOURCE = (1280, 720)          # 1914x1080 and 1280x720 broadcasts both occur
@@ -142,6 +143,57 @@ BROADCAST_BG_SIZE = (WIDTH // 4, HEIGHT // 4)
 BROADCAST_BG_BLUR = 8                       # gblur sigma at BROADCAST_BG_SIZE
 BROADCAST_BG_BRIGHTNESS = -0.25
 BROADCAST_BG_SATURATION = 0.8
+
+# Layout "top": horizontal footage sits in the TOP THIRD of the screen. The whole 16:9 game picture
+# is shown at full width, 1080x608, with its top edge at the spec's `top_y` (so the scoreline at
+# the top of the frame stays visible), over the same blurred, darkened cover of the picture that
+# layout "broadcast" uses. The caption sits above the picture (baseline TOP_CAPTION_GAP above
+# top_y), never over it. A clip's `source_kind` says where the picture comes from:
+#   "broadcast"  the whole source frame (any 16:9 from 1280x720 up); no facecam, so no cam windows;
+#   "kit"        a 1920x1080 recording of the kit's gameplay scene: the whole frame, with the
+#                facecam box covered by a blurred mirror of the pitch beside it;
+#   "bottom-cam" a 1920x1080 recording with the bottom-cam geometry: the frame without the
+#                spectator bar (the 16:9 region of the game block's height), facecam covered the
+#                same way.
+# `zoom` (1.0 to 1.6, default 1.0) crops the picture anchored at the TOP centre, so the scoreline is
+# kept. Cam windows of mode "below" show the stream's facecam in a block under the game, from the
+# window's start to its end, with a short fade in; the game keeps playing above it.
+# top_y bounds: the lowest value keeps the tallest caption glyphs (the baseline is 40 px above
+# top_y, a 64 px font) under the 150 px TikTok top zone; the highest keeps the cam block at least
+# 450 px high above the bottom zone (the last BOTTOM_UI_ZONE px of the frame stay clear).
+TOP_Y_DEFAULT = 300
+TOP_Y_RANGE = (280, 400)
+TOP_GAME_SIZE = (WIDTH, 608)
+TOP_CAPTION_GAP = 40
+TOP_ZOOM_RANGE = (1.0, 1.6)
+TOP_DEFAULT_ZOOM = 1.0
+BOTTOM_UI_ZONE = 370
+SOURCE_KINDS = (BROADCAST, "kit", "bottom-cam")
+DEFAULT_SOURCE_KIND = BROADCAST
+BELOW = "below"
+CAM_MODES_TOP = (BELOW,)
+BELOW_GAP = 40                              # between the game block and the cam block
+BELOW_MAX_HEIGHT = 608
+BELOW_FADE_IN = 0.15
+TOP_COVER_BLUR = 14
+
+
+class TopSource(NamedTuple):
+    base_crop: tuple      # w, h, x, y of the game region of the 1920x1080 frame, None: all of it
+    cover: tuple          # w, h, x, y of the facecam box (with its brackets), covered in the picture
+    donor_x: int          # the cover is the mirror of the same-size region starting here
+
+
+# Both are worked out from the numbers above: the kit box is x 30..610 with brackets and halo to
+# x 614 (KIT_PATCH_SRC starts right after it), the bottom-cam game block ends at GAME_CROP's
+# bottom (made even), its 16:9 width is centred.
+_BC_H = (GAME_CROP[1] + GAME_CROP[3]) // 2 * 2
+_BC_W = round(_BC_H * 16 / 9 / 2) * 2
+TOP_SOURCES = {
+    "kit": TopSource(None, (KIT_PATCH_SRC[2] - 28, KIT_PATCH_SRC[1], 28, KIT_PATCH_SRC[3]),
+                     KIT_PATCH_SRC[2]),
+    "bottom-cam": TopSource((_BC_W, _BC_H, (SRC_W - _BC_W) // 2 // 2 * 2, 0),
+                            (456, 258, 30, 782), 492)}
 
 # Any bold TrueType font works. Override with the TIKTOK_FONT environment variable.
 FONT_PATH = os.environ.get("TIKTOK_FONT") or "/usr/share/fonts/google-noto/NotoSans-Bold.ttf"
@@ -167,8 +219,8 @@ THREADS = "4"
 DASHES = ("\u2014", "\u2013")
 
 TOP_KEYS = {"caption", "output", "card_seconds", "opening_card", "music", "clips", "layout",
-            "sfx_dir", "card_sound", "crowd_bed", "crowd_stem", "clip_comp", "hook"}
-CLIP_KEYS = {"source", "start", "end", "sfx", "cam", "layout", "zoom"}
+            "sfx_dir", "card_sound", "crowd_bed", "crowd_stem", "clip_comp", "hook", "top_y"}
+CLIP_KEYS = {"source", "start", "end", "sfx", "cam", "layout", "zoom", "source_kind"}
 CAM_KEYS = {"start", "end", "mode", "x"}
 SFX_KEYS = {"at", "name", "gain_db", "start", "duration", "fade_in", "fade_out",
             "stop_at_clip_end"}
@@ -364,6 +416,48 @@ def _sfx_dir(value, default):
     return value
 
 
+def below_block(top_y):
+    """x, y, w, h of the cam block under the game block: BELOW_GAP below it, full width, as high
+    as fits above the bottom UI zone (at most BELOW_MAX_HEIGHT), even."""
+    y = top_y + TOP_GAME_SIZE[1] + BELOW_GAP
+    return 0, y, WIDTH, min(BELOW_MAX_HEIGHT, HEIGHT - BOTTOM_UI_ZONE - y) // 2 * 2
+
+
+def below_crop(kind, block_h):
+    """w, h, default x, y of the facecam crop that fills the cam block when scaled to cover it:
+    the facecam picture of the overlay (CAM_GEOMETRY), trimmed to the block's aspect on its
+    longer side and centred on the other, every number even."""
+    w, h, x, y = CAM_GEOMETRY[kind].inset_crop
+    aspect = WIDTH / block_h
+    cw, ch = (int(h * aspect) // 2 * 2, h) if w / h > aspect else (w, int(w / aspect) // 2 * 2)
+    return cw, ch, x + (w - cw) // 2 // 2 * 2, y + (h - ch) // 2 // 2 * 2
+
+
+def _below_x(raw, where, kind, top_y):
+    """Source x of a below window's crop: even, whole, with the crop inside the facecam picture."""
+    cw, _, default, _ = below_crop(kind, below_block(top_y)[3])
+    if "x" not in raw:
+        return default
+    x = _number(raw["x"], f"{where} x")
+    if x != int(x) or int(x) % 2:
+        raise SpecError(f"{where}: x must be an even whole number (got {x:g})")
+    low, high = CAM_GEOMETRY[kind].full_x_range[0], CAM_GEOMETRY[kind].full_x_range[1] - cw
+    return int(_ranged(x, f"{where} x", low, high))
+
+
+def _top_y(value):
+    """The y of the top edge of the game block of layout top: even, whole, inside TOP_Y_RANGE."""
+    number = _number(value, "top_y")
+    low, high = TOP_Y_RANGE
+    if number != int(number) or int(number) % 2:
+        raise SpecError(f"top_y must be an even whole number of pixels (got {number:g})")
+    if not low <= number <= high:
+        raise SpecError(f"top_y {number:g} is outside {low} to {high}: lower would put the "
+                        "caption under the TikTok top bar, higher would push the facecam block "
+                        "into the bottom UI zone")
+    return int(number)
+
+
 def _cam_x(raw, where, layout):
     """Source x of a full window's crop: even, whole, with the crop inside the layout's picture."""
     geometry = CAM_GEOMETRY[layout]
@@ -377,7 +471,7 @@ def _cam_x(raw, where, layout):
     return int(_ranged(x, f"{where} x", low, high))
 
 
-def _cam_window(raw, where, length, layout):
+def _cam_window(raw, where, length, layout, kind=None, top_y=TOP_Y_DEFAULT):
     _check_keys(raw, CAM_KEYS, where)
     for key in ("start", "end", "mode"):
         if key not in raw:
@@ -389,21 +483,26 @@ def _cam_window(raw, where, length, layout):
     if end - start < MIN_CAM_SECONDS - SOUND_END_TOLERANCE:
         raise SpecError(f"{where}: must be at least {MIN_CAM_SECONDS:g} s long")
     mode = raw["mode"]
-    if not isinstance(mode, str) or mode not in CAM_MODES:
-        raise SpecError(f"{where}: mode must be one of {', '.join(CAM_MODES)} (got {mode!r})")
+    modes = CAM_MODES_TOP if layout == TOP else CAM_MODES
+    if not isinstance(mode, str) or mode not in modes:
+        raise SpecError(f"{where}: mode must be one of {', '.join(modes)} (got {mode!r})")
     if mode == "inset" and "x" in raw:
         raise SpecError(f"{where}: x is only for full windows")
-    return {"start": start, "end": end, "mode": mode,
-            "x": _cam_x(raw, where, layout) if mode == "full" else None}
+    x = None
+    if mode == "full":
+        x = _cam_x(raw, where, layout)
+    elif mode == BELOW:
+        x = _below_x(raw, where, kind, top_y)
+    return {"start": start, "end": end, "mode": mode, "x": x}
 
 
-def _cam_windows(raw, where, length, layout):
+def _cam_windows(raw, where, length, layout, kind=None, top_y=TOP_Y_DEFAULT):
     """The cam list of a clip: windows in order, none overlapping (touching is fine)."""
     if not isinstance(raw, list):
         raise SpecError(f"{where}: cam must be a list")
     windows = []
     for n, item in enumerate(raw, 1):
-        window = _cam_window(item, f"{where} cam window {n}", length, layout)
+        window = _cam_window(item, f"{where} cam window {n}", length, layout, kind, top_y)
         if windows and window["start"] < windows[-1]["start"]:
             raise SpecError(f"{where} cam window {n}: windows must be in order")
         if windows and window["start"] < windows[-1]["end"]:
@@ -433,28 +532,51 @@ def clip_layout(clip, default):
     return clip.get("layout") or default
 
 
+def _source_kind(raw, layout, where):
+    """The source_kind of a clip of layout top (default broadcast); None for any other layout."""
+    if "source_kind" in raw and layout != TOP:
+        raise SpecError(f"{where}: source_kind is only for layout {TOP} (got {layout})")
+    if layout != TOP:
+        return None
+    kind = raw.get("source_kind", DEFAULT_SOURCE_KIND)
+    if not isinstance(kind, str) or kind not in SOURCE_KINDS:
+        raise SpecError(f"{where}: source_kind must be one of {', '.join(SOURCE_KINDS)} "
+                        f"(got {kind!r})")
+    return kind
+
+
 def _zoom(raw, layout, where):
-    """The zoom of a broadcast clip (default 1.25), or None for a clip of another layout."""
+    """The zoom of a broadcast clip (default 1.25) or of a top clip (default 1.0, anchored at the
+    top centre); None for a clip of another layout."""
+    if layout == TOP:
+        return _ranged(raw.get("zoom", TOP_DEFAULT_ZOOM), f"{where} zoom", *TOP_ZOOM_RANGE)
     if layout != BROADCAST:
         if "zoom" in raw:
-            raise SpecError(f"{where}: zoom is only for layout {BROADCAST} (got {layout})")
+            raise SpecError(f"{where}: zoom is only for layout {BROADCAST} or {TOP} "
+                            f"(got {layout})")
         return None
     return _ranged(raw.get("zoom", BROADCAST_DEFAULT_ZOOM), f"{where} zoom",
                    *BROADCAST_ZOOM_RANGE)
 
 
-def _check_cam_allowed(raw, layout, where):
+def _check_cam_allowed(raw, layout, where, kind=None):
     if "cam" not in raw:
         return
     if layout == BROADCAST:
         raise SpecError(f"{where}: cam windows are not allowed on a {BROADCAST} clip "
                         "(the source has no facecam)")
+    if layout == TOP:
+        if kind == DEFAULT_SOURCE_KIND:
+            raise SpecError(f"{where}: cam windows are not allowed on a {DEFAULT_SOURCE_KIND} "
+                            f"source in layout {TOP} (the source has no facecam)")
+        return
     if layout not in CAM_LAYOUTS:
         raise SpecError(f"{where}: cam windows need layout {' or '.join(CAM_LAYOUTS)} "
                         f"(got {layout})")
 
 
-def _clip(raw, index, sfx_dir, default_layout=DEFAULT_LAYOUT, where=None):
+def _clip(raw, index, sfx_dir, default_layout=DEFAULT_LAYOUT, where=None,
+          top_y=TOP_Y_DEFAULT):
     where = where or clip_label(index)
     _check_keys(raw, CLIP_KEYS, where)
     for key in ("source", "start", "end"):
@@ -477,11 +599,15 @@ def _clip(raw, index, sfx_dir, default_layout=DEFAULT_LAYOUT, where=None):
     sfx = [_sfx(item, f"{where} sfx {n + 1}", sfx_dir) for n, item in enumerate(sfx_raw)]
     own = _layout(raw["layout"], f"{where}: layout") if "layout" in raw else None
     layout = own or default_layout
-    _check_cam_allowed(raw, layout, where)
+    kind = _source_kind(raw, layout, where)
+    _check_cam_allowed(raw, layout, where, kind)
     zoom = _zoom(raw, layout, where)
-    cam = _cam_windows(raw.get("cam", []), where, length, layout) if layout != BROADCAST else []
+    cam = (_cam_windows(raw.get("cam", []), where, length, layout, kind, top_y)
+           if layout != BROADCAST else [])
     clip = {"source": raw["source"], "start_s": start, "end_s": end, "length": length,
             "sfx": sfx, "cam": cam, "layout": own}
+    if kind is not None:
+        clip["source_kind"] = kind
     return {**clip, "zoom": zoom} if zoom is not None else clip
 
 
@@ -533,11 +659,11 @@ def _music(raw):
     return {"path": raw["path"], "gain_db": gain, "start": start}
 
 
-def _hook(raw, sfx_dir, default_layout):
+def _hook(raw, sfx_dir, default_layout, top_y=TOP_Y_DEFAULT):
     """The optional hook: a clip object with the clip rules, or None."""
     if raw is None:
         return None
-    return _clip(raw, 0, sfx_dir, default_layout, where=HOOK)
+    return _clip(raw, 0, sfx_dir, default_layout, where=HOOK, top_y=top_y)
 
 
 def _check_output_clear(output, clips, music):
@@ -567,8 +693,9 @@ def validate_spec(raw, sfx_dir=SFX_DIR):
         raise SpecError(f"clips must be a list of 1 to {MAX_CLIPS} clips")
     sounds = _sfx_dir(raw.get("sfx_dir"), sfx_dir)
     layout = _layout(raw.get("layout", DEFAULT_LAYOUT))
-    clips = [_clip(c, i, sounds, layout) for i, c in enumerate(clips_raw)]
-    hook = _hook(raw.get("hook"), sounds, layout)
+    top_y = _top_y(raw.get("top_y", TOP_Y_DEFAULT))
+    clips = [_clip(c, i, sounds, layout, top_y=top_y) for i, c in enumerate(clips_raw)]
+    hook = _hook(raw.get("hook"), sounds, layout, top_y)
     card = frame_snap(card)
     _check_sfx_times(clips, card if opening else 0.0, hook, card)
     music = _music(raw.get("music"))
@@ -582,7 +709,7 @@ def validate_spec(raw, sfx_dir=SFX_DIR):
     if not isinstance(comp, bool):
         raise SpecError("clip_comp must be true or false")
     return {"caption": _caption(raw["caption"]), "output": output,
-            "layout": layout, "card_seconds": card,
+            "layout": layout, "top_y": top_y, "card_seconds": card,
             "opening_card": opening, "music": music, "clips": clips, "hook": hook,
             "clip_comp": comp,
             "card_sound": _card_sound(raw.get("card_sound"), sounds),
@@ -801,10 +928,13 @@ def broadcast_source_ok(width, height):
             and abs(width / height - 16 / 9) <= 16 / 9 * BROADCAST_ASPECT_TOLERANCE)
 
 
-def _check_source_size(path, size, layout):
+def _check_source_size(path, size, layout, kind=None):
     """Stream clips are cropped at fixed pixels, so they need exactly 1920x1080; a broadcast
-    clip takes any 16:9 video from 1280x720 up (1914x1080 broadcasts, 1440p, 4K)."""
+    clip takes any 16:9 video from 1280x720 up (1914x1080 broadcasts, 1440p, 4K). A top clip
+    follows its source_kind."""
     width, height = size
+    if layout == TOP:
+        layout = BROADCAST if kind in (None, DEFAULT_SOURCE_KIND) else kind
     if layout != BROADCAST:
         if size != (SRC_W, SRC_H):
             raise SpecError(f"{path} is {width}x{height}, the crops need {SRC_W}x{SRC_H}")
@@ -828,7 +958,7 @@ def check_sources(spec, probe=probe_source, exists=os.path.isfile, wav_duration=
                 raise SpecError(f"source video not found: {path}")
             info[path] = probe(path)
         size = (info[path]["width"], info[path]["height"])
-        _check_source_size(path, size, clip_layout(clip, spec["layout"]))
+        _check_source_size(path, size, clip_layout(clip, spec["layout"]), clip.get("source_kind"))
         if clip["end_s"] > info[path]["duration"]:
             raise SpecError(f"{clip_label(ref)} ends at {format_hms(clip['end_s'])}, past the "
                             f"end of {path} ({format_hms(info[path]['duration'])})")
@@ -887,13 +1017,14 @@ def _in_windows(windows):
                     for w in windows)
 
 
-def _drawtext(caption_file, hidden=()):
-    """The caption; `hidden` are the windows (full facecam) it is switched off in."""
+def _drawtext(caption_file, hidden=(), y=CAPTION_Y):
+    """The caption at y (an expression); `hidden` are the windows (full facecam) it is switched
+    off in."""
     enable = f":enable='not({_in_windows(hidden)})'" if hidden else ""
     return (f"drawtext=fontfile={escape_filter_path(FONT_PATH)}"
             f":textfile={escape_filter_path(caption_file)}:expansion=none"
             f":fontsize={FONT_SIZE}:fontcolor=white:borderw={BORDER_W}:bordercolor=black"
-            f":x=(w-text_w)/2:y={CAPTION_Y}{enable}")
+            f":x=(w-text_w)/2:y={y}{enable}")
 
 
 # The scales leave a sample aspect ratio such as 253:252 (2560:2559 for broadcast) on the picture,
@@ -972,6 +1103,17 @@ def _bottom_cam_graph(pad, cam):
             f"[s][g]vstack=inputs=2,{pad}" + _window_overlays(cam, "bottom-cam"))
 
 
+def _cover_background():
+    """The picture [k] scaled to cover the frame at a sixteenth of the pixels, blurred, darkened
+    and scaled up to the frame: [bg]. Shared by the broadcast and top layouts."""
+    bw, bh = BROADCAST_BG_SIZE
+    return (f"[k]scale={bw}:{bh}:force_original_aspect_ratio=increase:flags=bilinear,"
+            f"crop={bw}:{bh},format=yuv420p,gblur=sigma={BROADCAST_BG_BLUR},"
+            f"eq=brightness={BROADCAST_BG_BRIGHTNESS:g}"
+            f":saturation={BROADCAST_BG_SATURATION:g},"
+            f"scale={WIDTH}:{HEIGHT}:flags=bicubic[bg];")
+
+
 def _broadcast_graph(zoom):
     """The whole 16:9 frame, centre cropped by `zoom`, over a blurred, darkened copy of itself.
 
@@ -980,21 +1122,69 @@ def _broadcast_graph(zoom):
     frames, as the other layouts do. The crop is given as expressions of the input size, so any
     16:9 source works; it is kept even (yuv420p) and centred (the crop default).
     """
-    bw, bh = BROADCAST_BG_SIZE
     fw, fh = BROADCAST_SIZE
     z = f"{zoom:g}"
-    background = (f"[k]scale={bw}:{bh}:force_original_aspect_ratio=increase:flags=bilinear,"
-                  f"crop={bw}:{bh},format=yuv420p,gblur=sigma={BROADCAST_BG_BLUR},"
-                  f"eq=brightness={BROADCAST_BG_BRIGHTNESS:g}"
-                  f":saturation={BROADCAST_BG_SATURATION:g},"
-                  f"scale={WIDTH}:{HEIGHT}:flags=bicubic[bg];")
+    background = _cover_background()
     picture = (f"[m]crop=trunc(iw/{z}/2)*2:trunc(ih/{z}/2)*2,"
                f"scale={fw}:{fh}:flags=lanczos[fg];")
     return (f"[0:v]fps={FPS}:start_time=0,split=2[m][k];" + background + picture +
             f"[bg][fg]overlay={BROADCAST_AT[0]}:{BROADCAST_AT[1]}")
 
 
-def _picture_graph(layout, cam=(), zoom=BROADCAST_DEFAULT_ZOOM):
+def _top_base(source):
+    """Chains from the split source [b] (and the donor [p]) to the game picture, split into the
+    picture [m] and the background source [k]: the facecam box covered by a blurred mirror of the
+    pitch beside it, then the game region of the overlay. A broadcast has neither."""
+    if source is None:
+        return "[b]split=2[m][k];"
+    cw, ch, cx, cy = source.cover
+    base = ("," + "crop={}:{}:{}:{}".format(*source.base_crop)) if source.base_crop else ""
+    return (f"[p]crop={cw}:{ch}:{source.donor_x}:{cy},hflip,boxblur={TOP_COVER_BLUR}[patch];"
+            f"[b][patch]overlay={cx}:{cy}{base},split=2[m][k];")
+
+
+def _below_chain(k, window, kind, block_h):
+    """Facecam crop of window k scaled to the cam block, sharpened, fading in over BELOW_FADE_IN."""
+    cw, ch, _, cy = below_crop(kind, block_h)
+    return (f"[w{k}]crop={cw}:{ch}:{window['x']}:{cy},scale={WIDTH}:{block_h}:flags=lanczos,"
+            f"{CAM_SHARPEN},format=yuva420p,"
+            f"fade=t=in:st={frame_snap(window['start']):.4f}:d={BELOW_FADE_IN:g}:alpha=1[cam{k}];")
+
+
+def _top_graph(kind, zoom, top_y, cam):
+    """The game picture at full width with its top edge at top_y over the blurred cover of
+    itself, and the facecam block under it during the cam windows (never replacing the game).
+
+    The picture is cropped by `zoom` anchored at the top centre (the scoreline stays). Every cam
+    crop is cut from its own copy of the source [wk], taken before the facecam box is covered.
+    """
+    if cam and kind == DEFAULT_SOURCE_KIND:
+        raise ToolError(f"cam windows are not allowed on a {DEFAULT_SOURCE_KIND} source")
+    source = TOP_SOURCES.get(kind)
+    outs = "[b]" + ("[p]" if source else "") + "".join(f"[w{k}]" for k in range(len(cam)))
+    count = outs.count("[")
+    head = f"[0:v]fps={FPS}:start_time=0" + (f",split={count}{outs};" if count > 1 else "[b];")
+    fw, fh = TOP_GAME_SIZE
+    z = f"{zoom:g}"
+    picture = (f"[m]crop=trunc(iw/{z}/2)*2:trunc(ih/{z}/2)*2:trunc((iw-ow)/4)*2:0,"
+               f"scale={fw}:{fh}:flags=lanczos[fg];")
+    graph = head + _top_base(source) + _cover_background() + picture
+    if not cam:
+        return graph + f"[bg][fg]overlay=0:{top_y}"
+    _, block_y, _, block_h = below_block(top_y)
+    graph += "".join(_below_chain(k, w, kind, block_h) for k, w in enumerate(cam))
+    graph += f"[bg][fg]overlay=0:{top_y}[st];"
+    parts, previous = [], "st"
+    for k, window in enumerate(cam):
+        label = "" if k == len(cam) - 1 else f"[o{k}]"
+        parts.append(f"[{previous}][cam{k}]overlay=0:{block_y}:format=auto:"
+                     f"enable='{_in_windows([window])}'{label}")
+        previous = f"o{k}"
+    return graph + ";".join(parts)
+
+
+def _picture_graph(layout, cam=(), zoom=BROADCAST_DEFAULT_ZOOM, top_y=TOP_Y_DEFAULT,
+                   source_kind=DEFAULT_SOURCE_KIND):
     """Filter chains up to and including the stack and pad (the caption is added after).
 
     The kit blocks have odd heights (99, 1087), so stacked as yuv420p the chroma of one block
@@ -1006,6 +1196,8 @@ def _picture_graph(layout, cam=(), zoom=BROADCAST_DEFAULT_ZOOM):
         if cam:
             raise ToolError(f"cam windows are not allowed on a {BROADCAST} clip")
         return _broadcast_graph(zoom)
+    if layout == TOP:
+        return _top_graph(source_kind, zoom, top_y, cam)
     pad = f"pad={WIDTH}:{HEIGHT}:0:{PAD_Y[layout]}:black"
     if cam and layout not in CAM_LAYOUTS:
         raise ToolError(f"cam windows need layout {' or '.join(CAM_LAYOUTS)} (got {layout})")
@@ -1020,15 +1212,20 @@ def _picture_graph(layout, cam=(), zoom=BROADCAST_DEFAULT_ZOOM):
             _cam_chain() + f"[s][g][cam]vstack=inputs=3,{pad}")
 
 
-def _picture_chain(caption_file, layout=DEFAULT_LAYOUT, cam=(), zoom=BROADCAST_DEFAULT_ZOOM):
+def _picture_chain(caption_file, layout=DEFAULT_LAYOUT, cam=(), zoom=BROADCAST_DEFAULT_ZOOM,
+                   top_y=TOP_Y_DEFAULT, source_kind=DEFAULT_SOURCE_KIND):
     hidden = [w for w in cam if w["mode"] == "full"]
-    return (f"{_picture_graph(layout, cam, zoom)},{SQUARE_PIXELS},"
-            f"{_drawtext(caption_file, hidden)},format=yuv420p[v]")
+    # Layout top draws the caption above the game block: its baseline TOP_CAPTION_GAP above top_y.
+    caption_y = f"{top_y - TOP_CAPTION_GAP}-ascent" if layout == TOP else CAPTION_Y
+    return (f"{_picture_graph(layout, cam, zoom, top_y, source_kind)},{SQUARE_PIXELS},"
+            f"{_drawtext(caption_file, hidden, caption_y)},format=yuv420p[v]")
 
 
-def clip_command(clip, caption_file, out_path, layout=DEFAULT_LAYOUT, clip_comp=False):
+def clip_command(clip, caption_file, out_path, layout=DEFAULT_LAYOUT, clip_comp=False,
+                 top_y=TOP_Y_DEFAULT):
     length = clip["length"]
     layout = clip_layout(clip, layout)
+    zoom = clip.get("zoom", TOP_DEFAULT_ZOOM if layout == TOP else BROADCAST_DEFAULT_ZOOM)
     comp = f"{CLIP_COMP}," if clip_comp else ""
     audio = (f"[0:a]{STEREO_48K},{comp}"
              f"afade=t=in:d={CLIP_FADE_IN},"
@@ -1037,8 +1234,9 @@ def clip_command(clip, caption_file, out_path, layout=DEFAULT_LAYOUT, clip_comp=
     return (FFMPEG + ["-threads", THREADS, "-ss", f"{clip['start_s']:.3f}", "-i", clip["source"],
                       "-t", f"{length:.3f}",
                       "-filter_complex",
-                      _picture_chain(caption_file, layout, clip.get("cam", ()),
-                                     clip.get("zoom", BROADCAST_DEFAULT_ZOOM)) + ";" + audio,
+                      _picture_chain(caption_file, layout, clip.get("cam", ()), zoom, top_y,
+                                     clip.get("source_kind", DEFAULT_SOURCE_KIND))
+                      + ";" + audio,
                       "-map", "[v]", "-map", "[a]"]
             + ENCODE + PCM + ["-threads", THREADS, out_path])
 
@@ -1218,7 +1416,8 @@ def _scene_commands(spec, timeline, tmp):
             yield path, card_command(seg["duration"], caption_file, path)
         else:
             clip = clip_for(spec, seg["clip"])
-            yield path, clip_command(clip, caption_file, path, spec["layout"], spec["clip_comp"])
+            yield path, clip_command(clip, caption_file, path, spec["layout"], spec["clip_comp"],
+                                     spec.get("top_y", TOP_Y_DEFAULT))
 
 
 def render(spec, keep_temp=False, runner=run_tool, probe_output=None, measurer=run_stderr,
