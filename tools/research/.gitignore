@@ -1,0 +1,10 @@
+# your own account lists and everything the scripts download or write
+accounts-*.json
+raw/
+stats-accounts.csv
+stats-videos.csv
+stats-summary.json
+cuts-sample.json
+cuts-results.json
+cuts-results.csv
+cuts-dl/
