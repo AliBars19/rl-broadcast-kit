@@ -1,0 +1,19 @@
+{
+  "caption": "Clutch.",
+  "output": "/path/to/tiktoks/top-montage.mp4",
+  "layout": "top",
+  "top_y": 300,
+  "card_seconds": 0.75,
+  "opening_card": true,
+  "clip_comp": true,
+  "clips": [
+    {"source": "/path/to/broadcast-a.mp4", "start": 38.8, "end": 45.3},
+    {"source": "/path/to/broadcast-b.mp4", "start": 196.3, "end": 202.8, "zoom": 1.2},
+    {"source": "/path/to/broadcast-c.mp4", "start": 16.5, "end": 22.0},
+    {"source": "/path/to/stream.mp4", "start": "00:11:00", "end": "00:11:04.5",
+     "source_kind": "kit",
+     "cam": [{"start": 2.5, "end": 4.0, "mode": "below"}]},
+    {"source": "/path/to/broadcast-a.mp4", "start": 306.9, "end": 313.4},
+    {"source": "/path/to/broadcast-b.mp4", "start": 110.2, "end": 116.7}
+  ]
+}

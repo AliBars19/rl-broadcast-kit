@@ -520,6 +520,27 @@ class TopCommandTests(SfxDirCase):
         self.assertIn(f"y={rt.CAPTION_Y}", cmd[cmd.index("-filter_complex") + 1])
 
 
+class ExamplesTests(SfxDirCase):
+    def load(self, name):
+        with open(os.path.join(HERE, "tiktoks", name), encoding="utf-8") as handle:
+            return json.load(handle)
+
+    def test_the_montage_example_validates_and_fits_the_budget(self):
+        spec = self.validate(self.load("top-montage.example.json"))
+        self.assertEqual(spec["layout"], "top")
+        rt.check_budget(rt.build_timeline(spec)["total"])
+
+    def test_the_montage_mixes_broadcast_clips_with_a_short_own_clip(self):
+        spec = self.validate(self.load("top-montage.example.json"))
+        kinds = [c["source_kind"] for c in spec["clips"]]
+        self.assertIn("kit", kinds)
+        self.assertGreater(kinds.count("broadcast"), 3)
+        own = [c for c in spec["clips"] if c["source_kind"] == "kit"]
+        self.assertTrue(all(c["length"] <= 5 for c in own))
+        self.assertEqual([w["mode"] for w in own[0]["cam"]], ["below"])
+        self.assertNotEqual(kinds[-1], "kit")                    # more broadcast clips follow
+
+
 # ---------------------------------------------------------------- real ffmpeg
 
 W, H = rt.WIDTH, rt.HEIGHT
